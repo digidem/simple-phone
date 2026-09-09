@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CoMapeo Kiosk</string>
+    <string name="device_admin_description">Locks this device to the apps your organisation set up, so it cannot be changed by accident.</string>
+    <string name="provisioning_title">Setting up this device</string>
+    <string name="provisioning_body">Installing apps. Keep the device near the trainer\'s phone.</string>
+</resources>

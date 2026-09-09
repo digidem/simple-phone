@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Provisioning payloads arrive over plain HTTP from the trainer's local-only
+  hotspot. Integrity comes from the signing-certificate checks in ApkInstaller,
+  not from the transport, and the hotspot has no certificate to pin anyway.
+
+  The gateway address varies by OEM and cannot be enumerated here — network
+  security config matches hostnames, not address ranges — so cleartext is
+  permitted globally. The updater's GitHub traffic uses explicit https:// URLs,
+  which HttpURLConnection will not silently downgrade.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lock_break_title">This device is temporarily unlocked</string>
+    <plurals name="lock_break_body">
+        <item quantity="one">It will lock itself again in %d minute.</item>
+        <item quantity="other">It will lock itself again in %d minutes.</item>
+    </plurals>
+    <string name="sideload_download_failed">Could not download from %1$s: %2$s</string>
+    <string name="sideload_ok">%1$s was installed.</string>
+</resources>
