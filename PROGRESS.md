@@ -9,7 +9,8 @@ carry on. Update this file at every phase boundary and whenever you stop.
 
 ## Next step
 
-Scaffold the `comapeo-kiosk` Gradle project (phase 1).
+Phase 2 UI tests (launcher grid, hidden admin gesture, PIN), then phase 3 —
+the `comapeo-provision` app.
 
 ## Established facts
 
@@ -40,6 +41,14 @@ Determined empirically this run; do not re-derive.
    (`NONE`/`WPA`/`WEP`/`EAP`); WPA3-SAE routes to the manual tethering fallback.
 5. Deps: NanoHTTPD, ZXing `core` only, kotlinx-serialization, WorkManager,
    PBKDF2WithHmacSHA256 for the PIN.
+6. **WorkManager's automatic initialiser is removed from the manifest.** It runs
+   on the main thread at process start; on a slow device that pushed the
+   launcher's first window past the 5s input-dispatch grace and the system
+   ANR-killed the HOME activity at boot. Found on the emulator, but budget
+   hardware is exactly where it would bite. WorkManager now starts on first use
+   via `Configuration.Provider`.
+7. The launcher loads its app list off the main thread and rasterises icons
+   once, rather than doing disk and PackageManager work during composition.
 
 ## Answered by Gregor
 
@@ -50,6 +59,13 @@ Determined empirically this run; do not re-derive.
 
 ## Phase status
 
-- [ ] Phase 1 - policy core
-- [ ] Phase 2 - launcher and admin screen
+- [x] **Phase 1 - policy core.** 31 instrumented tests green on `kiosk_aosp_30`.
+      Shade unreachable in lock task, battery/signal visible, every intended
+      restriction set and every excluded one unset, location on, recents
+      unreachable, force-stop blocked, provision idempotent, certificate
+      verification refusing a mismatched APK, PIN backoff.
+      Reboot survival confirmed by hand: after `adb reboot` the launcher is the
+      resumed activity with `mLockTaskModeState=LOCKED`, and `BootReceiver`
+      logs the policy re-application.
+- [ ] Phase 2 - launcher and admin screen (UI written, UI tests outstanding)
 - [ ] Phase 3 - provisioning app

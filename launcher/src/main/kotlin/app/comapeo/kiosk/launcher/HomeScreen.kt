@@ -22,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -30,7 +29,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -52,6 +50,7 @@ fun HomeScreen(
             Text(
                 text = stringResource(R.string.launcher_empty),
                 style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -88,7 +87,7 @@ private fun AppIcon(app: LaunchableApp, onLaunch: (String) -> Unit) {
             .testTag(tagFor(app.packageName)),
     ) {
         Image(
-            bitmap = app.icon.toBitmap(ICON_PX, ICON_PX).asImageBitmap(),
+            bitmap = app.icon,
             contentDescription = app.label,
             contentScale = ContentScale.Fit,
             modifier = Modifier.size(96.dp),
@@ -129,8 +128,6 @@ private fun AdminCorner(onTriggered: () -> Unit, modifier: Modifier = Modifier) 
             },
     )
 }
-
-private const val ICON_PX = 192
 
 /** Long enough that it cannot be reached by an accidental press. */
 private const val ADMIN_HOLD_MS = 5_000L

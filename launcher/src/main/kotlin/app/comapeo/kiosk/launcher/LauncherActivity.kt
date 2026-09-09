@@ -7,7 +7,14 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import app.comapeo.kiosk.policy.ConfigStore
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 /**
  * The HOME activity.
@@ -18,12 +25,11 @@ import app.comapeo.kiosk.policy.ConfigStore
  */
 class LauncherActivity : ComponentActivity() {
 
-    private lateinit var configStore: ConfigStore
     private var screen by mutableStateOf(Screen.Home)
+    private var apps by mutableStateOf(emptyList<LaunchableApp>())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        configStore = ConfigStore(this)
 
         onBackPressedDispatcher.addCallback(this) {
             // Back on the home screen does nothing. Back elsewhere returns to
@@ -33,9 +39,18 @@ class LauncherActivity : ComponentActivity() {
 
         setContent {
             KioskTheme {
+                // Surfaces Compose test tags as resource ids so UiAutomator can
+                // find them, which is what the lock-task tests need — they
+                // cannot use Compose's own test rule from outside the process.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .semantics { testTagsAsResourceId = true }
+                        .testTag(TAG_LAUNCHER_ROOT),
+                ) {
                 when (screen) {
                     Screen.Home -> HomeScreen(
-                        apps = AppList.visible(this, configStore.load()),
+                        apps = apps,
                         onLaunch = ::launchApp,
                         onAdminGesture = { screen = Screen.PinEntry },
                     )
@@ -47,8 +62,16 @@ class LauncherActivity : ComponentActivity() {
 
                     Screen.Admin -> AdminScreen(onDone = { screen = Screen.Home })
                 }
+                }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Refreshed on every start rather than once: the admin screen can
+        // change which apps are visible, and the updater can install new ones.
+        lifecycleScope.launch { apps = AppList.load(this@LauncherActivity) }
     }
 
     override fun onStop() {
@@ -65,3 +88,5 @@ class LauncherActivity : ComponentActivity() {
 
     enum class Screen { Home, PinEntry, Admin }
 }
+
+const val TAG_LAUNCHER_ROOT = "launcher-root"
