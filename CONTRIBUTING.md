@@ -250,11 +250,10 @@ but varies by OEM.
 does not exist on an emulator, and its behaviour on budget phones is
 inconsistent enough that a manual fallback is needed in the field anyway.
 
-**The admin screen's list of saved Wi-Fi networks is empty on a real phone.**
-From Android 10 `getConfiguredNetworks` needs location permission, which the
-kiosk does not declare, Device Owner or not. Adding a network still works. The
-list would need `ACCESS_FINE_LOCATION` declared and self-granted at provisioning;
-that is a product decision, not an oversight.
+**The kiosk declares and grants itself `ACCESS_FINE_LOCATION`.** From Android
+10 listing saved Wi-Fi networks needs it, Device Owner or not, and the admin
+screen shows that list. Nothing in the kiosk uses location for anything else;
+the grant is one policy step so a re-apply restores it.
 
 **`:sample` exists only to give the end-to-end test a real APK to install.** It
 is not shipped. The test cannot install the kiosk over itself mid-run, and a

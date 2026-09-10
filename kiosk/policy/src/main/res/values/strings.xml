@@ -11,6 +11,7 @@
     <string name="policy_failed_lock_task">This device could not be locked to its apps, so the person using it can still leave them. Set the device up again from the trainer\'s phone.</string>
     <string name="policy_failed_home">This app could not be made the home screen, so the device will start somewhere else. Set the device up again from the trainer\'s phone.</string>
     <string name="policy_failed_user_restrictions">Some settings on this device are not protected, so they can still be changed by the person using it. Set the device up again from the trainer\'s phone.</string>
+    <string name="policy_failed_own_permissions">The kiosk could not give itself permission to list Wi-Fi networks. Re-apply the lock settings from the admin screen.</string>
     <string name="policy_failed_location_and_time">Location and automatic time could not be turned on. Turn both on by hand in the device settings before handing the device over.</string>
     <string name="policy_failed_screen">The screen timeout and lock screen could not be set. Set the screen timeout by hand in the device settings.</string>
     <string name="policy_failed_uninstall_protection">The apps on this device are not protected from being uninstalled. Re-apply the lock settings from the admin screen once the apps have finished installing.</string>

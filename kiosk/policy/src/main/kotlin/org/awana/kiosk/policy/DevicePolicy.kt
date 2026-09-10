@@ -64,6 +64,7 @@ class DevicePolicy(context: Context) {
         steps.run("home", R.string.policy_failed_home) { applyHome() }
         steps.run("userRestrictions", R.string.policy_failed_user_restrictions) { applyUserRestrictions() }
         steps.run("locationAndTime", R.string.policy_failed_location_and_time) { applyLocationAndTime() }
+        steps.run("ownPermissions", R.string.policy_failed_own_permissions) { applyOwnPermissions() }
         steps.run("screen", R.string.policy_failed_screen) { applyScreen(config) }
         return steps.result()
     }
@@ -211,6 +212,21 @@ class DevicePolicy(context: Context) {
     }
 
     // --- Permissions ---------------------------------------------------------
+
+    /**
+     * Grants this app what it needs to list saved Wi-Fi networks, which from
+     * Android 10 requires location permission even for a Device Owner. The
+     * admin screen shows that list; nothing here uses location for anything.
+     */
+    fun applyOwnPermissions() {
+        val granted = dpm.setPermissionGrantState(
+            admin,
+            appContext.packageName,
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED,
+        )
+        check(granted) { "ACCESS_FINE_LOCATION was not granted to ${appContext.packageName}" }
+    }
 
     /**
      * Pre-grants each package's runtime permissions, in the order the config

@@ -169,4 +169,16 @@ class PolicyTest {
         assertEquals(policy.lockTaskPackages().sorted(), policy.lockTaskPackages().sorted())
         assertTrue(second.report.failures.isEmpty())
     }
+
+    @Test
+    fun theKioskCanListSavedWifiNetworksAfterProvisioning() = runBlocking {
+        Provisioner(context).provision(TestConfigs.policyOnly())
+
+        // From Android 10 the saved-network list needs location permission,
+        // which the admin screen relies on to show what a device can join.
+        assertEquals(
+            DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED,
+            policy.grantState(context.packageName, android.Manifest.permission.ACCESS_FINE_LOCATION),
+        )
+    }
 }
