@@ -20,15 +20,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import org.awana.kiosk.shared.AdminPin
 
 @Composable
 fun NewPinFields(onSubmit: (String) -> Unit) {
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
 
-    val tooShort = pin.isNotEmpty() && pin.length < MIN_PIN_LENGTH
+    val tooShort = pin.isNotEmpty() && pin.length < AdminPin.MIN_LENGTH
     val mismatch = confirm.isNotEmpty() && pin != confirm
-    val valid = pin.length >= MIN_PIN_LENGTH && pin == confirm
+    val valid = pin.length >= AdminPin.MIN_LENGTH && pin == confirm
 
     Column(modifier = Modifier.padding(16.dp)) {
         OutlinedTextField(
@@ -42,7 +43,7 @@ fun NewPinFields(onSubmit: (String) -> Unit) {
             modifier = Modifier.fillMaxWidth().testTag(TAG_PIN_NEW),
         )
         if (tooShort) {
-            Text(stringResource(R.string.pin_too_short, MIN_PIN_LENGTH))
+            Text(stringResource(R.string.pin_too_short, AdminPin.MIN_LENGTH))
         }
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
@@ -135,7 +136,6 @@ fun InstallUrlFields(enabled: Boolean, onInstall: (url: String, packageName: Str
     }
 }
 
-private const val MIN_PIN_LENGTH = 4
 
 const val TAG_PIN_NEW = "pin-new"
 const val TAG_PIN_CONFIRM = "pin-confirm"

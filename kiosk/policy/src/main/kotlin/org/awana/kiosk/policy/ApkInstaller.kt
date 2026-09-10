@@ -103,10 +103,13 @@ class ApkInstaller(context: Context) {
             // the point is only that a broadcast that never arrives cannot
             // hang provisioning for ever.
             return withTimeoutOrNull(INSTALL_TIMEOUT_MS) { result.await() }
-                ?: InstallOutcome.Failure(
-                    packageName,
-                    "$packageName is still not installed after ten minutes. Restart the device and set it up again.",
-                )
+                ?: run {
+                    installer.abandonSession(sessionId)
+                    InstallOutcome.Failure(
+                        packageName,
+                        "$packageName is still not installed after ten minutes. Restart the device and set it up again.",
+                    )
+                }
         } catch (e: Exception) {
             installer.abandonSession(sessionId)
             return InstallOutcome.Failure(packageName, "Could not write the $packageName APK: ${e.message}")

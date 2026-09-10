@@ -3,8 +3,8 @@ package org.awana.provision
 import android.content.Context
 import android.util.Log
 import kotlinx.serialization.Serializable
+import org.awana.kiosk.shared.KioskJson
 import org.awana.kiosk.shared.WifiNetwork
-import kotlinx.serialization.json.Json as KotlinJson
 import java.io.File
 import java.util.UUID
 
@@ -86,13 +86,9 @@ class ProfileStore(context: Context) {
     }
 }
 
-/** One configured [Json] instance, so encoding is identical everywhere. */
+/** Encoding helpers over the shared configuration, so profiles and library entries match the wire format. */
 object Json {
-    val format = KotlinJson {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-        prettyPrint = true
-    }
+    val format = KioskJson.pretty
 
     fun encodeList(entries: List<ApkEntry>): String =
         format.encodeToString(kotlinx.serialization.builtins.ListSerializer(ApkEntry.serializer()), entries)

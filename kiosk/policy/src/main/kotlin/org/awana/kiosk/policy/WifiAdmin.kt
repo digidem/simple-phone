@@ -57,9 +57,10 @@ class WifiAdmin(context: Context) {
             return false
         }
         // Not saveConfiguration(): from Android 10 it is a no-op that always
-        // returns false, which made every successful add report as a failure.
-        // The framework persists the network as it is added.
-        if (!wifi.enableNetwork(networkId, true)) {
+        // returns false. And never disable the others: at provisioning the
+        // device is still on the trainer's hotspot with a report to send, so
+        // the new network is saved for auto-join rather than switched to.
+        if (!wifi.enableNetwork(networkId, false)) {
             Log.w(TAG, "$ssid was saved but could not be connected to")
         }
         return true
