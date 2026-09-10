@@ -2,6 +2,7 @@ package org.awana.kiosk
 
 import org.awana.kiosk.shared.KioskConfig
 import org.awana.kiosk.shared.PackageSpec
+import org.awana.kiosk.shared.WifiNetwork
 import org.awana.kiosk.shared.AdminPin
 
 /**
@@ -21,6 +22,7 @@ object TestConfigs {
         showNotificationShade: Boolean = false,
         packages: List<PackageSpec> = listOf(appSpec()),
         visible: List<String> = packages.map { it.packageName },
+        wifiNetworks: List<WifiNetwork> = emptyList(),
     ) = KioskConfig(
         deploymentId = "test-deployment",
         deploymentName = "Test Deployment",
@@ -28,6 +30,7 @@ object TestConfigs {
         serverUrl = null,
         packages = packages,
         visibleInLauncher = visible,
+        wifiNetworks = wifiNetworks,
         showNotificationShade = showNotificationShade,
         locale = "en",
         screenOffTimeoutMs = 120_000,

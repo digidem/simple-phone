@@ -26,6 +26,36 @@
           period gets it ANR-killed at boot (WorkManager's initialiser once did
           exactly that). Measure before adding any startup work.
         -->
+        <!--
+          From Android 11 the setup wizard asks the DPC for these two before it
+          will finish a QR enrolment. Both are answered without any UI; the
+          BIND_DEVICE_ADMIN permission is what keeps other apps from starting
+          them, since they have to be exported for the wizard to reach them.
+        -->
+        <activity
+            android:name=".ProvisioningModeActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:theme="@style/Theme.Kiosk">
+            <intent-filter>
+                <action android:name="android.app.action.GET_PROVISIONING_MODE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".PolicyComplianceActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:theme="@style/Theme.Kiosk">
+            <intent-filter>
+                <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".ProvisioningService"
             android:exported="false"

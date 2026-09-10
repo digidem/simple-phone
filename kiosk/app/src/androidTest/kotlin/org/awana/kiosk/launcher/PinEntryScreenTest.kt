@@ -51,8 +51,9 @@ class PinEntryScreenTest {
 
         type(PIN)
         compose.onNodeWithTag("pin-key-✓").performClick()
-        compose.waitForIdle()
 
+        // The check runs off the main thread, so waitForIdle alone would race it.
+        compose.waitUntil(CHECK_TIMEOUT_MS) { unlocked }
         assertEquals(true, unlocked)
     }
 
@@ -63,8 +64,12 @@ class PinEntryScreenTest {
 
         type("0000")
         compose.onNodeWithTag("pin-key-✓").performClick()
-        compose.waitForIdle()
 
+        // The check clears what was typed when it refuses it; waiting for that
+        // is what tells the test the off-thread check has finished.
+        compose.waitUntil(CHECK_TIMEOUT_MS) {
+            compose.onNodeWithTag(TAG_PIN_DOTS).textOrNull().isNullOrEmpty()
+        }
         assertFalse(unlocked)
     }
 
@@ -104,15 +109,19 @@ class PinEntryScreenTest {
 
     private companion object {
         const val PIN = "246813"
+
+        /** The PIN check is 120k PBKDF2 iterations on a slow emulator. */
+        const val CHECK_TIMEOUT_MS = 10_000L
     }
 }
 
-private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertTextEquals(expected: String) {
-    val node = fetchSemanticsNode()
-    val text = node.config
+private fun androidx.compose.ui.test.SemanticsNodeInteraction.textOrNull(): String? =
+    fetchSemanticsNode().config
         .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)
         ?.joinToString("") { it.text }
-    org.junit.Assert.assertEquals(expected, text)
+
+private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertTextEquals(expected: String) {
+    org.junit.Assert.assertEquals(expected, textOrNull())
 }
 
 private fun <T> androidx.compose.ui.semantics.SemanticsConfiguration.getOrNull(

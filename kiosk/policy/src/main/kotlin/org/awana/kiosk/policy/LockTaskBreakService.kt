@@ -28,11 +28,6 @@ class LockTaskBreakService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_RELOCK) {
-            relock()
-            return START_NOT_STICKY
-        }
-
         val durationMs = intent?.getLongExtra(EXTRA_DURATION_MS, DEFAULT_DURATION_MS)
             ?: DEFAULT_DURATION_MS
         remainingMs = durationMs
@@ -99,7 +94,6 @@ class LockTaskBreakService : Service() {
         private const val CHANNEL = "lock-break"
         private const val NOTIFICATION_ID = 2
         private const val EXTRA_DURATION_MS = "duration"
-        private const val ACTION_RELOCK = "org.awana.kiosk.RELOCK"
 
         const val DEFAULT_DURATION_MS = 10 * 60_000L
 
@@ -107,12 +101,6 @@ class LockTaskBreakService : Service() {
             context.startForegroundService(
                 Intent(context, LockTaskBreakService::class.java)
                     .putExtra(EXTRA_DURATION_MS, durationMs),
-            )
-        }
-
-        fun relockNow(context: Context) {
-            context.startForegroundService(
-                Intent(context, LockTaskBreakService::class.java).setAction(ACTION_RELOCK),
             )
         }
     }

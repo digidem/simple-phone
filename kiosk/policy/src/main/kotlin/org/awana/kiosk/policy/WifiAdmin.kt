@@ -24,6 +24,11 @@ class WifiAdmin(context: Context) {
     /** Still permitted for Device Owner apps, unlike for ordinary apps. */
     fun setEnabled(enabled: Boolean): Boolean = wifi.setWifiEnabled(enabled)
 
+    /**
+     * Empty rather than wrong when the platform refuses: from Android 10
+     * `getConfiguredNetworks` needs location permission, which this app does not
+     * hold, so an empty list here does not mean no networks are saved.
+     */
     fun savedNetworks(): List<String> = try {
         @Suppress("DEPRECATION")
         wifi.configuredNetworks.orEmpty().mapNotNull { it.SSID?.trim('"') }
@@ -51,8 +56,13 @@ class WifiAdmin(context: Context) {
             Log.w(TAG, "addNetwork refused for $ssid")
             return false
         }
-        wifi.enableNetwork(networkId, true)
-        return wifi.saveConfiguration()
+        // Not saveConfiguration(): from Android 10 it is a no-op that always
+        // returns false, which made every successful add report as a failure.
+        // The framework persists the network as it is added.
+        if (!wifi.enableNetwork(networkId, true)) {
+            Log.w(TAG, "$ssid was saved but could not be connected to")
+        }
+        return true
     }
 
     private companion object {

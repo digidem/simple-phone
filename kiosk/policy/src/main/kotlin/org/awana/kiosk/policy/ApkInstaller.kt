@@ -10,6 +10,7 @@ import android.content.pm.PackageInstaller
 import android.util.Log
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 sealed interface InstallOutcome {
@@ -98,7 +99,14 @@ class ApkInstaller(context: Context) {
                 )
                 session.commit(pending.intentSender)
             }
-            return result.await()
+            // Generous, because a ~190 MB payload on a slow phone is normal;
+            // the point is only that a broadcast that never arrives cannot
+            // hang provisioning for ever.
+            return withTimeoutOrNull(INSTALL_TIMEOUT_MS) { result.await() }
+                ?: InstallOutcome.Failure(
+                    packageName,
+                    "$packageName is still not installed after ten minutes. Restart the device and set it up again.",
+                )
         } catch (e: Exception) {
             installer.abandonSession(sessionId)
             return InstallOutcome.Failure(packageName, "Could not write the $packageName APK: ${e.message}")
@@ -146,5 +154,6 @@ class ApkInstaller(context: Context) {
     private companion object {
         const val TAG = "ApkInstaller"
         const val ACTION_PREFIX = "org.awana.kiosk.INSTALL_RESULT"
+        const val INSTALL_TIMEOUT_MS = 10 * 60_000L
     }
 }

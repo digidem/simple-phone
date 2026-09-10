@@ -46,6 +46,7 @@ class ProvisioningService : Service() {
         startForeground()
 
         scope.launch {
+            val provisioner = Provisioner(applicationContext)
             val bootstrap = ProvisioningBootstrap(serverUrl, configSha256)
             val staged = File(cacheDir, CONFIG_FILE)
             val config = ConfigFetch.fetch(bootstrap, staged).getOrElse { error ->
@@ -53,8 +54,8 @@ class ProvisioningService : Service() {
                 // is nothing to apply and no server URL that can be trusted to
                 // report to. Recorded where the admin screen will show it.
                 Log.e(TAG, "Could not obtain the deployment config", error)
-                Provisioner(applicationContext).recordBootstrapFailure(
-                    error.message ?: "The deployment settings could not be obtained.",
+                provisioner.recordBootstrapFailure(
+                    error.message ?: getString(R.string.provisioning_config_failed),
                 )
                 launchHome()
                 stopSelf(startId)
@@ -62,7 +63,7 @@ class ProvisioningService : Service() {
             }
             staged.delete()
 
-            runCatching { Provisioner(applicationContext).provision(config) }
+            runCatching { provisioner.provision(config) }
                 .onSuccess {
                     Log.i(
                         TAG,

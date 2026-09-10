@@ -1,5 +1,6 @@
 package org.awana.kiosk.launcher
 
+import org.awana.kiosk.shared.DeviceLabel
 import org.awana.kiosk.shared.KioskConfig
 import android.app.Activity
 import android.content.Context
@@ -33,6 +34,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.awana.kiosk.policy.ConfigStore
+import org.awana.kiosk.policy.DeviceFacts
 import org.awana.kiosk.policy.DevicePolicy
 import org.awana.kiosk.policy.LockTaskBreakService
 import org.awana.kiosk.policy.Provisioner
@@ -77,6 +79,7 @@ private fun AdminMenu(onNavigate: (Page) -> Unit, onDone: () -> Unit) {
     var result by remember { mutableStateOf<String?>(null) }
     var confirmUnprovision by remember { mutableStateOf(false) }
     var confirmUnlock by remember { mutableStateOf(false) }
+    var unprovisionProblems by remember { mutableStateOf<String?>(null) }
 
     AdminPage(title = stringResource(R.string.admin_title), onBack = onDone, testTag = TAG_ADMIN_MENU) {
         item { AdminRow(R.string.admin_device_info, TAG_ROW_DEVICE_INFO) { onNavigate(Page.DeviceInfo) } }
@@ -114,6 +117,7 @@ private fun AdminMenu(onNavigate: (Page) -> Unit, onDone: () -> Unit) {
         )
     }
     result?.let { Info(text = it, onDismiss = { result = null }) }
+    unprovisionProblems?.let { Info(text = it, onDismiss = { unprovisionProblems = null; onDone() }) }
 
     if (confirmUnlock) {
         Confirm(
@@ -139,9 +143,12 @@ private fun AdminMenu(onNavigate: (Page) -> Unit, onDone: () -> Unit) {
             onConfirm = {
                 confirmUnprovision = false
                 (context as? Activity)?.stopLockTask()
-                DevicePolicy(context).unprovision()
-                ConfigStore(context).clear()
-                onDone()
+                scope.launch {
+                    busy = context.getString(R.string.admin_unprovision)
+                    val problems = unprovision(context)
+                    busy = null
+                    if (problems.isEmpty()) onDone() else unprovisionProblems = problems.joinToString("\n\n")
+                }
             },
             onDismiss = { confirmUnprovision = false },
         )
@@ -155,14 +162,31 @@ private suspend fun reapplyPolicy(context: Context): String = withContext(Dispat
     if (!policy.isDeviceOwner) {
         return@withContext context.getString(R.string.admin_not_device_owner)
     }
-    val applied = policy.applyAll(config)
-    policy.applyNetworkRestrictions()
-    val failures = policy.applyPermissions(config)
-    if (failures.isEmpty()) {
-        context.getString(R.string.admin_reapply_ok, applied.size)
+    val result = policy.applyAll(config)
+    val problems = result.failures + result.permissionFailures
+    if (problems.isEmpty()) {
+        context.getString(R.string.admin_reapply_ok, result.applied.size)
     } else {
-        context.getString(R.string.admin_reapply_partial, failures.joinToString(", "))
+        context.getString(R.string.admin_reapply_partial, problems.joinToString("\n\n"))
     }
+}
+
+/**
+ * Clears the config whatever happens: leaving it behind after the lock is
+ * partly gone puts the device in a state neither the launcher nor a trainer can
+ * make sense of.
+ */
+private suspend fun unprovision(context: Context): List<String> = withContext(Dispatchers.Default) {
+    val store = ConfigStore(context)
+    val config = store.load()
+    val failures = try {
+        DevicePolicy(context).unprovision(config)
+    } catch (e: Exception) {
+        listOf(context.getString(R.string.admin_unprovision_failed))
+    } finally {
+        store.clear()
+    }
+    failures
 }
 
 // --- Pages ---------------------------------------------------------------
@@ -176,6 +200,9 @@ private fun DeviceInfoPage(onBack: () -> Unit) {
 
     val rows = remember {
         buildList {
+            // The code the trainer matches against the dashboard; six identical
+            // phones are otherwise indistinguishable.
+            add(R.string.info_device_label to DeviceLabel.of(DeviceFacts.deviceId(context)))
             add(R.string.info_manufacturer to android.os.Build.MANUFACTURER)
             add(R.string.info_model to android.os.Build.MODEL)
             add(R.string.info_android to "${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")

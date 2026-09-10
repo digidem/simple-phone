@@ -12,6 +12,19 @@ import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
 
+/** What one pass over the policy set did, and what a trainer has to be told about. */
+data class PolicyResult(
+    val applied: List<String> = emptyList(),
+    val failures: List<String> = emptyList(),
+    val permissionFailures: List<String> = emptyList(),
+) {
+    operator fun plus(other: PolicyResult) = PolicyResult(
+        applied + other.applied,
+        failures + other.failures,
+        permissionFailures + other.permissionFailures,
+    )
+}
+
 /**
  * Wrapper over [DevicePolicyManager] holding the whole policy set.
  *
@@ -26,6 +39,7 @@ class DevicePolicy(context: Context) {
         appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     private val userManager =
         appContext.getSystemService(Context.USER_SERVICE) as UserManager
+    private val wifi = WifiAdmin(appContext)
 
     val admin: ComponentName = resolveAdminComponent(appContext)
 
@@ -33,20 +47,48 @@ class DevicePolicy(context: Context) {
         get() = dpm.isDeviceOwnerApp(appContext.packageName)
 
     /**
-     * Applies everything except the restrictions that could interfere with the
-     * provisioning network. Call [applyNetworkRestrictions] once the device no
-     * longer needs the provisioning hotspot.
+     * The whole policy set, for a device whose apps are already installed. The
+     * boot receiver and the admin screen's re-apply both call this; only
+     * provisioning splits it either side of the payload install.
      */
-    fun applyAll(config: KioskConfig): List<String> {
-        val applied = mutableListOf<String>()
-        step(applied, "lockTask") { applyLockTask(config) }
-        step(applied, "home") { applyHome() }
-        step(applied, "uninstallProtection") { applyUninstallProtection(config) }
-        step(applied, "userRestrictions") { applyUserRestrictions() }
-        step(applied, "locationAndTime") { applyLocationAndTime() }
-        step(applied, "permissions") { applyPermissions(config) }
-        step(applied, "screen") { applyScreen(config) }
-        return applied
+    fun applyAll(config: KioskConfig): PolicyResult =
+        applyBeforeInstall(config) + applyAfterInstall(config)
+
+    /**
+     * Everything that does not need the payload installed yet, and nothing that
+     * could disturb the network the payload arrives over.
+     */
+    fun applyBeforeInstall(config: KioskConfig): PolicyResult {
+        val steps = Steps()
+        steps.run("lockTask", R.string.policy_failed_lock_task) { applyLockTask(config) }
+        steps.run("home", R.string.policy_failed_home) { applyHome() }
+        steps.run("userRestrictions", R.string.policy_failed_user_restrictions) { applyUserRestrictions() }
+        steps.run("locationAndTime", R.string.policy_failed_location_and_time) { applyLocationAndTime() }
+        steps.run("screen", R.string.policy_failed_screen) { applyScreen(config) }
+        return steps.result()
+    }
+
+    /**
+     * Uninstall blocking and permission grants only take for packages that
+     * exist, so they run once the payload is installed; the network
+     * restrictions run last of all, when nothing else needs the provisioning
+     * hotspot.
+     */
+    fun applyAfterInstall(config: KioskConfig): PolicyResult {
+        val steps = Steps()
+        steps.run("uninstallProtection", R.string.policy_failed_uninstall_protection) {
+            steps.failures += applyUninstallProtection(config)
+        }
+        steps.run("permissions", R.string.policy_failed_permissions) {
+            steps.permissionFailures += applyPermissions(config)
+        }
+        steps.run("wifiNetworks", R.string.policy_failed_wifi_networks) {
+            steps.failures += applyWifiNetworks(config)
+        }
+        steps.run("networkRestrictions", R.string.policy_failed_network_restrictions) {
+            applyNetworkRestrictions()
+        }
+        return steps.result()
     }
 
     // --- Lock task -----------------------------------------------------------
@@ -100,10 +142,24 @@ class DevicePolicy(context: Context) {
 
     // --- Uninstall and force-stop protection ---------------------------------
 
-    fun applyUninstallProtection(config: KioskConfig) {
+    /**
+     * Returns the packages it could not protect. A package that is not installed
+     * yet is not one of them: the payload install runs between the two passes,
+     * and the second pass is what makes the block stick.
+     */
+    fun applyUninstallProtection(config: KioskConfig): List<String> {
+        val failures = mutableListOf<String>()
         config.packages.forEach { spec ->
             runCatching { dpm.setUninstallBlocked(admin, spec.packageName, true) }
-                .onFailure { Log.w(TAG, "setUninstallBlocked failed for ${spec.packageName}", it) }
+                .onFailure {
+                    Log.w(TAG, "setUninstallBlocked failed for ${spec.packageName}", it)
+                    if (isInstalled(spec.packageName)) {
+                        failures += appContext.getString(
+                            R.string.policy_failed_uninstall_blocked,
+                            spec.packageName,
+                        )
+                    }
+                }
         }
         // No DPM API at any level touches OEM battery managers, and there is no
         // public doze exemption. Blocking force-stop and clear-data is the
@@ -111,6 +167,7 @@ class DevicePolicy(context: Context) {
         val protected = (listOf(appContext.packageName) + config.packages.map { it.packageName })
             .distinct()
         dpm.setUserControlDisabledPackages(admin, protected)
+        return failures
     }
 
     // --- User restrictions ---------------------------------------------------
@@ -129,6 +186,21 @@ class DevicePolicy(context: Context) {
     }
 
     fun hasRestriction(key: String): Boolean = userManager.hasUserRestriction(key)
+
+    // --- Wi-Fi ---------------------------------------------------------------
+
+    /**
+     * Joins the networks the deployment ships with. A user cannot add one once
+     * `DISALLOW_CONFIG_WIFI` is set, so a network missing here is a team that
+     * cannot sync until someone with the admin PIN visits the device.
+     */
+    fun applyWifiNetworks(config: KioskConfig): List<String> {
+        val saved = wifi.savedNetworks()
+        return config.wifiNetworks
+            .filter { it.ssid !in saved }
+            .filterNot { wifi.addNetwork(it.ssid, it.passphrase) }
+            .map { appContext.getString(R.string.policy_failed_wifi_network, it.ssid) }
+    }
 
     // --- Location and time ---------------------------------------------------
 
@@ -172,6 +244,8 @@ class DevicePolicy(context: Context) {
         return failures
     }
 
+    private fun isInstalled(packageName: String): Boolean = requestedPermissions(packageName) != null
+
     /** Null when the package is not installed. */
     private fun requestedPermissions(packageName: String): Set<String>? = try {
         appContext.packageManager
@@ -189,43 +263,71 @@ class DevicePolicy(context: Context) {
     fun applyScreen(config: KioskConfig) {
         // Only takes effect while no lockscreen password is set, which is the
         // provisioned state.
-        runCatching { dpm.setKeyguardDisabled(admin, true) }
-            .onFailure { Log.w(TAG, "setKeyguardDisabled failed", it) }
-        runCatching {
-            dpm.setSystemSetting(
-                admin,
-                Settings.System.SCREEN_OFF_TIMEOUT,
-                config.screenOffTimeoutMs.toString(),
-            )
-        }.onFailure { Log.w(TAG, "SCREEN_OFF_TIMEOUT failed", it) }
+        dpm.setKeyguardDisabled(admin, true)
+        dpm.setSystemSetting(
+            admin,
+            Settings.System.SCREEN_OFF_TIMEOUT,
+            config.screenOffTimeoutMs.toString(),
+        )
     }
 
     // --- Un-provisioning -----------------------------------------------------
 
     /**
-     * Returns the device to a normal, unmanaged state. Cannot be undone without
-     * a factory reset.
+     * Returns the device to a normal, unmanaged state and says in words what it
+     * could not undo. Cannot be undone without a factory reset.
+     *
+     * [config] names the packages whose uninstall blocking has to be lifted;
+     * without it those apps could be left undeletable after the owner is gone.
      */
-    fun unprovision() {
-        runCatching { clearHome() }
-        runCatching { dpm.setLockTaskPackages(admin, emptyArray()) }
-        runCatching { dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_NONE) }
-        (NON_NETWORK_RESTRICTIONS + NETWORK_RESTRICTIONS).forEach {
-            runCatching { dpm.clearUserRestriction(admin, it) }
+    fun unprovision(config: KioskConfig?): List<String> {
+        val steps = Steps()
+        steps.run("home", R.string.unprovision_failed_home) { clearHome() }
+        steps.run("lockTask", R.string.unprovision_failed_lock_task) {
+            dpm.setLockTaskPackages(admin, emptyArray())
+            dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_NONE)
         }
-        runCatching { dpm.setUserControlDisabledPackages(admin, emptyList()) }
-        runCatching { dpm.setKeyguardDisabled(admin, false) }
-        runCatching { dpm.setPermissionPolicy(admin, DevicePolicyManager.PERMISSION_POLICY_PROMPT) }
-        dpm.clearDeviceOwnerApp(appContext.packageName)
+        steps.run("restrictions", R.string.unprovision_failed_restrictions) {
+            (NON_NETWORK_RESTRICTIONS + NETWORK_RESTRICTIONS).forEach {
+                dpm.clearUserRestriction(admin, it)
+            }
+        }
+        config?.packages.orEmpty().forEach { spec ->
+            steps.run("uninstallBlocked:${spec.packageName}", R.string.unprovision_failed_uninstall_blocked) {
+                dpm.setUninstallBlocked(admin, spec.packageName, false)
+            }
+        }
+        steps.run("userControl", R.string.unprovision_failed_uninstall_blocked) {
+            dpm.setUserControlDisabledPackages(admin, emptyList())
+        }
+        steps.run("screen", R.string.unprovision_failed_screen) {
+            dpm.setKeyguardDisabled(admin, false)
+            dpm.setPermissionPolicy(admin, DevicePolicyManager.PERMISSION_POLICY_PROMPT)
+        }
+        // Last, because once the owner is gone none of the calls above is allowed.
+        steps.run("deviceOwner", R.string.unprovision_failed_device_owner) {
+            dpm.clearDeviceOwnerApp(appContext.packageName)
+        }
+        return steps.result().failures.distinct()
     }
 
-    private inline fun step(into: MutableList<String>, name: String, body: () -> Unit) {
-        try {
-            body()
-            into += name
-        } catch (e: Exception) {
-            Log.e(TAG, "Policy step '$name' failed", e)
+    private inner class Steps {
+        val applied = mutableListOf<String>()
+        val failures = mutableListOf<String>()
+        val permissionFailures = mutableListOf<String>()
+
+        /** Records the step's name, or a message a trainer can act on. */
+        fun run(name: String, failureMessage: Int, body: () -> Unit) {
+            try {
+                body()
+                applied += name
+            } catch (e: Exception) {
+                Log.e(TAG, "Policy step '$name' failed", e)
+                failures += appContext.getString(failureMessage)
+            }
         }
+
+        fun result() = PolicyResult(applied, failures, permissionFailures)
     }
 
     companion object {

@@ -42,9 +42,11 @@ class BootReceiver : BroadcastReceiver() {
             return
         }
 
-        val applied = policy.applyAll(config)
-        policy.applyNetworkRestrictions()
-        Log.i(TAG, "Re-applied at boot: $applied")
+        val result = policy.applyAll(config)
+        Log.i(TAG, "Re-applied at boot: ${result.applied}")
+        if (result.failures.isNotEmpty()) {
+            Log.e(TAG, "Policy not fully re-applied at boot: ${result.failures}")
+        }
 
         val pending = goAsync()
         GlobalScope.launch(Dispatchers.IO) {

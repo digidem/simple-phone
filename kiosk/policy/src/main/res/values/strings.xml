@@ -7,4 +7,23 @@
     </plurals>
     <string name="sideload_download_failed">Could not download from %1$s: %2$s</string>
     <string name="sideload_ok">%1$s was installed.</string>
+
+    <string name="policy_failed_lock_task">This device could not be locked to its apps, so the person using it can still leave them. Set the device up again from the trainer\'s phone.</string>
+    <string name="policy_failed_home">This app could not be made the home screen, so the device will start somewhere else. Set the device up again from the trainer\'s phone.</string>
+    <string name="policy_failed_user_restrictions">Some settings on this device are not protected, so they can still be changed by the person using it. Set the device up again from the trainer\'s phone.</string>
+    <string name="policy_failed_location_and_time">Location and automatic time could not be turned on. Turn both on by hand in the device settings before handing the device over.</string>
+    <string name="policy_failed_screen">The screen timeout and lock screen could not be set. Set the screen timeout by hand in the device settings.</string>
+    <string name="policy_failed_uninstall_protection">The apps on this device are not protected from being uninstalled. Re-apply the lock settings from the admin screen once the apps have finished installing.</string>
+    <string name="policy_failed_uninstall_blocked">%1$s can still be uninstalled by the person using the device. Re-apply the lock settings from the admin screen.</string>
+    <string name="policy_failed_permissions">The apps could not be given their permissions in advance, so each app will ask for them the first time. Open every app once and allow what it asks for.</string>
+    <string name="policy_failed_wifi_networks">The Wi-Fi networks for this deployment could not be added. Add them by hand on the Wi-Fi page of the admin screen.</string>
+    <string name="policy_failed_wifi_network">The Wi-Fi network %1$s could not be added. Add it by hand on the Wi-Fi page of the admin screen.</string>
+    <string name="policy_failed_network_restrictions">Wi-Fi and mobile network settings are not locked down, so the person using the device can still change them. Re-apply the lock settings from the admin screen.</string>
+
+    <string name="unprovision_failed_home">The home screen could not be released, so this app may still start instead of the normal one. Erase the device to clear it.</string>
+    <string name="unprovision_failed_lock_task">The lock on the apps could not be removed. Erase the device to clear it.</string>
+    <string name="unprovision_failed_restrictions">Some settings are still protected and cannot be changed. Erase the device to clear them.</string>
+    <string name="unprovision_failed_uninstall_blocked">Some apps still cannot be uninstalled. Erase the device to clear that.</string>
+    <string name="unprovision_failed_screen">The lock screen and app permission settings were left as they were. Change them by hand in the device settings.</string>
+    <string name="unprovision_failed_device_owner">This app is still in charge of the device. Erase the device to remove it.</string>
 </resources>

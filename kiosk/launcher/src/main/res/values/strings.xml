@@ -34,10 +34,12 @@
     <string name="admin_not_device_owner">This app is not the device owner, so it cannot change the lock settings. The device needs to be set up again from the trainer\'s phone.</string>
     <string name="admin_reapply_ok">Done. %1$d groups of settings were applied.</string>
     <string name="admin_reapply_partial">Some settings could not be applied: %1$s</string>
+    <string name="admin_unprovision_failed">The lock could not be removed from this device. Erase the device and set it up again from the trainer\'s phone.</string>
 
     <string name="admin_unlock_explain">The home screen lock will be turned off so you can use the rest of the device. It will turn itself back on after 10 minutes, so the device cannot be left unlocked by accident.</string>
     <string name="admin_unprovision_explain">This turns the device back into a normal Android phone. The home screen lock is removed, apps can be uninstalled again, and settings are no longer protected.\n\nThis cannot be undone. Putting the lock back requires erasing the phone completely and setting it up again from the trainer\'s phone.</string>
 
+    <string name="info_device_label">Device code</string>
     <string name="info_manufacturer">Make</string>
     <string name="info_model">Model</string>
     <string name="info_android">Android version</string>

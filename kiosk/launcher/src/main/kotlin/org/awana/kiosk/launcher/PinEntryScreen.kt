@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +32,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.awana.kiosk.policy.ConfigStore
 import org.awana.kiosk.policy.PinGate
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Numeric PIN entry, on the app's own keypad rather than the system keyboard —
@@ -43,8 +47,10 @@ fun PinEntryScreen(onUnlocked: () -> Unit, onCancel: () -> Unit) {
     val gate = remember { PinGate(context) }
     val hash = remember { ConfigStore(context).load()?.adminPinHash }
 
+    val scope = rememberCoroutineScope()
     var entered by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var checking by remember { mutableStateOf(false) }
     var lockoutMs by remember { mutableStateOf(gate.lockoutRemainingMs()) }
 
     LaunchedEffect(lockoutMs) {
@@ -60,12 +66,20 @@ fun PinEntryScreen(onUnlocked: () -> Unit, onCancel: () -> Unit) {
             error = context.getString(R.string.pin_no_config)
             return
         }
-        if (gate.check(entered, encoded)) {
-            onUnlocked()
-        } else {
-            entered = ""
-            lockoutMs = gate.lockoutRemainingMs()
-            error = context.getString(R.string.pin_wrong)
+        if (checking) return
+        scope.launch {
+            checking = true
+            // 120k PBKDF2 iterations: on the main thread this freezes the
+            // keypad for long enough to look broken on a budget phone.
+            val ok = withContext(Dispatchers.Default) { gate.check(entered, encoded) }
+            checking = false
+            if (ok) {
+                onUnlocked()
+            } else {
+                entered = ""
+                lockoutMs = gate.lockoutRemainingMs()
+                error = context.getString(R.string.pin_wrong)
+            }
         }
     }
 
@@ -108,7 +122,7 @@ fun PinEntryScreen(onUnlocked: () -> Unit, onCancel: () -> Unit) {
             )
 
             Keypad(
-                enabled = lockoutMs == 0L,
+                enabled = lockoutMs == 0L && !checking,
                 onDigit = { if (entered.length < MAX_PIN) entered += it },
                 onDelete = { entered = entered.dropLast(1) },
                 onSubmit = ::submit,

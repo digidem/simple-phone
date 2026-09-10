@@ -37,35 +37,18 @@ class Provisioner(
     private val configStore = ConfigStore(appContext)
 
     suspend fun provision(config: KioskConfig): ProvisionResult {
-        val failures = mutableListOf<String>()
-
         configStore.save(config)
 
-        // Everything except the restrictions that could disturb the hotspot the
-        // payload is about to arrive over.
-        val applied = policy.applyAll(config).toMutableList()
+        val before = policy.applyBeforeInstall(config)
+        val installFailures = if (config.serverUrl != null) installPayload(config) else emptyList()
+        val after = policy.applyAfterInstall(config)
 
-        if (config.serverUrl != null) {
-            failures += installPayload(config)
-        }
-
-        // Uninstall blocking and permission grants both only take for packages
-        // that exist, so they are re-run now that the payload is installed.
-        runCatching { policy.applyUninstallProtection(config) }
-            .onFailure { failures += "Could not protect apps from being uninstalled: ${it.message}" }
-        val permissionFailures = runCatching { policy.applyPermissions(config) }
-            .getOrElse {
-                failures += "Could not pre-grant permissions: ${it.message}"
-                emptyList()
-            }
-
-        // Now that nothing else needs the provisioning network.
-        runCatching {
-            policy.applyNetworkRestrictions()
-            applied += "networkRestrictions"
-        }.onFailure { failures += "Could not lock down network settings: ${it.message}" }
-
-        val report = buildReport(config, applied, failures, permissionFailures)
+        val report = buildReport(
+            config,
+            applied = before.applied + after.applied,
+            failures = before.failures + installFailures + after.failures,
+            permissionFailures = after.permissionFailures,
+        )
         saveLastReport(report)
 
         val delivered = config.serverUrl?.let { reporter.send(it, report) } ?: false
@@ -98,16 +81,17 @@ class Provisioner(
         return failures
     }
 
+    /** [config] is null only before there was one to apply; see [recordBootstrapFailure]. */
     private fun buildReport(
-        config: KioskConfig,
-        applied: List<String>,
-        failures: List<String>,
-        permissionFailures: List<String>,
+        config: KioskConfig?,
+        applied: List<String> = emptyList(),
+        failures: List<String> = emptyList(),
+        permissionFailures: List<String> = emptyList(),
     ) = EnrolmentReport(
         deviceId = DeviceFacts.deviceId(appContext),
         deviceLabel = DeviceLabel.of(DeviceFacts.deviceId(appContext)),
-        deploymentId = config.deploymentId,
-        deploymentName = config.deploymentName,
+        deploymentId = config?.deploymentId.orEmpty(),
+        deploymentName = config?.deploymentName.orEmpty(),
         manufacturer = android.os.Build.MANUFACTURER,
         model = android.os.Build.MODEL,
         androidVersion = android.os.Build.VERSION.RELEASE,
@@ -115,7 +99,7 @@ class Provisioner(
         kioskVersion = kioskVersion(),
         buildVariant = buildVariant(),
         isDeviceOwner = policy.isDeviceOwner,
-        installed = config.packages.mapNotNull {
+        installed = config?.packages.orEmpty().mapNotNull {
             DeviceFacts.installedPackage(appContext, it.packageName)
         },
         policiesApplied = applied,
@@ -133,27 +117,7 @@ class Provisioner(
      * device would sit on an empty launcher with no explanation.
      */
     fun recordBootstrapFailure(reason: String) {
-        saveLastReport(
-            EnrolmentReport(
-                deviceId = DeviceFacts.deviceId(appContext),
-                deviceLabel = DeviceLabel.of(DeviceFacts.deviceId(appContext)),
-                deploymentId = "",
-                deploymentName = "",
-                manufacturer = android.os.Build.MANUFACTURER,
-                model = android.os.Build.MODEL,
-                androidVersion = android.os.Build.VERSION.RELEASE,
-                apiLevel = android.os.Build.VERSION.SDK_INT,
-                kioskVersion = kioskVersion(),
-                buildVariant = buildVariant(),
-                isDeviceOwner = policy.isDeviceOwner,
-                installed = emptyList(),
-                policiesApplied = emptyList(),
-                failures = listOf(reason),
-                permissionFailures = emptyList(),
-                hostileOem = DeviceFacts.hostileOem(),
-                reportedAtEpochMs = System.currentTimeMillis(),
-            ),
-        )
+        saveLastReport(buildReport(config = null, failures = listOf(reason)))
     }
 
     fun lastReport(): EnrolmentReport? {
