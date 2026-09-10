@@ -19,3 +19,6 @@ rootProject.name = "comapeo-kiosk"
 include(":app")
 include(":policy")
 include(":launcher")
+
+// Not shipped. A real APK for the end-to-end provisioning test to install.
+include(":sample")

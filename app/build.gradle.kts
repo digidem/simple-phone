@@ -77,12 +77,32 @@ android {
     sourceSets {
         // The golden provisioning payload lives at the repository root because
         // the same file is checked into comapeo-provision, which generates it.
-        getByName("androidTest").assets.srcDirs(rootProject.file("testdata"))
+        // The sample APK is built by :sample for the end-to-end test to install.
+        getByName("androidTest").assets.srcDirs(
+            rootProject.file("testdata"),
+            layout.buildDirectory.dir("generated/androidTestAssets"),
+        )
     }
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+}
+
+/**
+ * Puts a real, installable APK where the end-to-end test can serve it. The test
+ * cannot install the kiosk over itself mid-run, and a hand-made file would not
+ * exercise the certificate reader or PackageInstaller.
+ */
+val copySamplePayload = tasks.register<Copy>("copySamplePayload") {
+    dependsOn(":sample:assembleDebug")
+    from(rootProject.file("sample/build/outputs/apk/debug/sample-debug.apk"))
+    into(layout.buildDirectory.dir("generated/androidTestAssets"))
+    rename { "sample-payload.apk" }
+}
+
+tasks.matching { it.name == "mergeDebugAndroidTestAssets" }.configureEach {
+    dependsOn(copySamplePayload)
 }
 
 dependencies {
@@ -98,6 +118,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
 
     androidTestImplementation(libs.kotlinx.serialization.json)
+    androidTestImplementation(libs.nanohttpd)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.runner)
