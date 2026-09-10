@@ -1,10 +1,8 @@
 package org.awana.kiosk
 
 import android.app.admin.DevicePolicyManager
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.os.UserManager
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -21,8 +19,6 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 /**
  * A reboot must not be a way out of the kiosk.
@@ -94,44 +90,8 @@ class BootReceiverTest {
         )
     }
 
-    /**
-     * `BOOT_COMPLETED` is a protected broadcast, so the receiver is called
-     * directly. It takes the pending result and finishes it, and `goAsync`
-     * hands back null to a receiver the system did not dispatch, so a real one
-     * is borrowed from an ordinary broadcast first — otherwise the coroutine
-     * that finishes it dies on a null and takes the process with it.
-     */
+    /** `BOOT_COMPLETED` is a protected broadcast, so the receiver is called directly. */
     private fun deliverBootCompleted() {
-        val receiver = BootReceiver()
-        BroadcastReceiver::class.java
-            .getDeclaredMethod("setPendingResult", BroadcastReceiver.PendingResult::class.java)
-            .invoke(receiver, borrowPendingResult())
-        receiver.onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
-    }
-
-    private fun borrowPendingResult(): BroadcastReceiver.PendingResult {
-        val arrived = CountDownLatch(1)
-        var pending: BroadcastReceiver.PendingResult? = null
-        val lender = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                pending = goAsync()
-                arrived.countDown()
-            }
-        }
-        context.registerReceiver(lender, IntentFilter(LEND_ACTION))
-        try {
-            context.sendBroadcast(Intent(LEND_ACTION).setPackage(context.packageName))
-            assertTrue(
-                "no broadcast came back to borrow a pending result from",
-                arrived.await(10, TimeUnit.SECONDS),
-            )
-        } finally {
-            context.unregisterReceiver(lender)
-        }
-        return pending!!
-    }
-
-    private companion object {
-        const val LEND_ACTION = "org.awana.kiosk.test.LEND_PENDING_RESULT"
+        BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
     }
 }

@@ -7,12 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
@@ -39,15 +33,6 @@ class LauncherActivity : ComponentActivity() {
 
         setContent {
             KioskTheme {
-                // Surfaces Compose test tags as resource ids so UiAutomator can
-                // find them, which is what the lock-task tests need — they
-                // cannot use Compose's own test rule from outside the process.
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .semantics { testTagsAsResourceId = true }
-                        .testTag(TAG_LAUNCHER_ROOT),
-                ) {
                 when (screen) {
                     Screen.Home -> HomeScreen(
                         apps = apps,
@@ -61,7 +46,6 @@ class LauncherActivity : ComponentActivity() {
                     )
 
                     Screen.Admin -> AdminScreen(onDone = { screen = Screen.Home })
-                }
                 }
             }
         }
@@ -88,5 +72,3 @@ class LauncherActivity : ComponentActivity() {
 
     enum class Screen { Home, PinEntry, Admin }
 }
-
-const val TAG_LAUNCHER_ROOT = "launcher-root"

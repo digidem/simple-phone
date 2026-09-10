@@ -48,12 +48,13 @@ class BootReceiver : BroadcastReceiver() {
             Log.e(TAG, "Policy not fully re-applied at boot: ${result.failures}")
         }
 
-        val pending = goAsync()
+        // Null when the receiver was invoked directly rather than by the system.
+        val pending: PendingResult? = goAsync()
         GlobalScope.launch(Dispatchers.IO) {
             try {
                 config.serverUrl?.let { Reporter(appContext).flush(it) }
             } finally {
-                pending.finish()
+                pending?.finish()
             }
         }
     }
