@@ -17,6 +17,8 @@ import java.io.File
 
 data class SessionState(
     val running: Boolean = false,
+    /** Set as soon as a session is asked for, so a recreated activity can find it. */
+    val profileId: String? = null,
     val profileName: String = "",
     val hotspot: HotspotDetails? = null,
     val serverUrl: String? = null,
@@ -44,18 +46,22 @@ class ProvisioningSession(context: Context) {
     private var hotspot: Hotspot? = null
     private var server: ProvisioningServer? = null
 
+    /** True while this profile's session is starting, running or showing its error. */
+    fun isActiveFor(profileId: String): Boolean = _state.value.profileId == profileId
+
     suspend fun start(profile: DeploymentProfile, hotspot: Hotspot): Result<Unit> {
         stop()
         this.hotspot = hotspot
+        _state.value = SessionState(profileId = profile.id, profileName = profile.name)
 
         val details = hotspot.start().getOrElse { error ->
-            _state.value = SessionState(error = error.message)
+            _state.value = failed(profile, error.message)
             return Result.failure(error)
         }
 
         val kioskApk = bundledKioskApk().getOrElse { error ->
             hotspot.stop()
-            _state.value = SessionState(error = error.message)
+            _state.value = failed(profile, error.message)
             return Result.failure(error)
         }
 
@@ -68,7 +74,7 @@ class ProvisioningSession(context: Context) {
         if (missing.isNotEmpty()) {
             hotspot.stop()
             val message = "These apps are not in the library yet: ${missing.joinToString(", ")}"
-            _state.value = SessionState(error = message)
+            _state.value = failed(profile, message)
             return Result.failure(IllegalStateException(message))
         }
 
@@ -116,7 +122,7 @@ class ProvisioningSession(context: Context) {
         )
         runCatching { running.start(SOCKET_TIMEOUT_MS, false) }.getOrElse { error ->
             hotspot.stop()
-            _state.value = SessionState(error = "The server could not start: ${error.message}")
+            _state.value = failed(profile, "The server could not start: ${error.message}")
             return Result.failure(error)
         }
         server = running
@@ -134,6 +140,7 @@ class ProvisioningSession(context: Context) {
 
         _state.value = SessionState(
             running = true,
+            profileId = profile.id,
             profileName = profile.name,
             hotspot = details,
             serverUrl = serverUrl,
@@ -147,16 +154,22 @@ class ProvisioningSession(context: Context) {
         server = null
         hotspot?.stop()
         hotspot = null
-        _state.update { it.copy(running = false) }
+        _state.value = SessionState()
     }
 
-    /** Copies the bundled kiosk APK out of assets so it can be served by length. */
+    private fun failed(profile: DeploymentProfile, message: String?) =
+        SessionState(profileId = profile.id, profileName = profile.name, error = message)
+
+    /**
+     * Copies the bundled kiosk APK out of assets so it can be served by length.
+     *
+     * Copied every session: the cache directory survives an update of this app,
+     * so a kept copy would go on serving the kiosk build that shipped before it.
+     */
     private fun bundledKioskApk(): Result<File> = runCatching {
         val target = File(appContext.cacheDir, KIOSK_APK)
-        if (!target.exists() || target.length() == 0L) {
-            appContext.assets.open(KIOSK_APK).use { input ->
-                target.outputStream().use { input.copyTo(it) }
-            }
+        appContext.assets.open(KIOSK_APK).use { input ->
+            target.outputStream().use { input.copyTo(it) }
         }
         if (target.length() == 0L) error("The bundled kiosk app is missing from this build.")
         target

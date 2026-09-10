@@ -15,9 +15,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,9 +45,12 @@ private fun ProvisionApp() {
     // The session screen takes over the whole app while it is running: a
     // trainer holding a phone up to another phone should not be able to
     // navigate away from the code by accident.
-    var sessionProfileId by remember { mutableStateOf<String?>(null) }
+    var sessionProfileId by rememberSaveable { mutableStateOf<String?>(null) }
+    val sessionState by SessionService.session.state.collectAsState()
 
-    val current = sessionProfileId
+    // A session outlives this activity, so a rotation or a recreation comes
+    // back to the session already running rather than starting a second one.
+    val current = sessionProfileId ?: sessionState.profileId
     if (current != null) {
         SessionScreen(profileId = current, onFinished = { sessionProfileId = null })
         return

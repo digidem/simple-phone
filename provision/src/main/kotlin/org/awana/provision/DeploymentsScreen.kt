@@ -38,6 +38,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.awana.kiosk.shared.AdminPin
+import org.awana.kiosk.shared.WifiNetwork
 
 @Composable
 fun DeploymentsScreen(modifier: Modifier = Modifier, onStartSession: (String) -> Unit) {
@@ -46,6 +47,7 @@ fun DeploymentsScreen(modifier: Modifier = Modifier, onStartSession: (String) ->
     var profiles by remember { mutableStateOf(store.all()) }
     var editing by remember { mutableStateOf<DeploymentProfile?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
+    var exporting by remember { mutableStateOf<DeploymentProfile?>(null) }
 
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -53,7 +55,7 @@ fun DeploymentsScreen(modifier: Modifier = Modifier, onStartSession: (String) ->
             context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
         }.getOrNull()
         if (text == null) {
-            message = "That file could not be read."
+            message = context.getString(R.string.deployment_import_unreadable)
             return@rememberLauncherForActivityResult
         }
         store.import(text)
@@ -61,7 +63,24 @@ fun DeploymentsScreen(modifier: Modifier = Modifier, onStartSession: (String) ->
                 store.save(it)
                 profiles = store.all()
             }
-            .onFailure { message = "That file is not a deployment: ${it.message}" }
+            .onFailure { message = context.getString(R.string.deployment_import_not_a_deployment) }
+    }
+
+    val exporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        val profile = exporting
+        exporting = null
+        if (uri == null || profile == null) return@rememberLauncherForActivityResult
+        val written = runCatching {
+            context.contentResolver.openOutputStream(uri)?.use {
+                it.write(store.export(profile).toByteArray())
+            }
+        }.getOrNull()
+        message = context.getString(
+            if (written == null) R.string.deployment_export_failed
+            else R.string.deployment_export_saved,
+        )
     }
 
     val target = editing
@@ -132,7 +151,10 @@ fun DeploymentsScreen(modifier: Modifier = Modifier, onStartSession: (String) ->
                         store.save(profile.duplicate())
                         profiles = store.all()
                     }) { Text(stringResource(R.string.action_duplicate)) }
-                    TextButton(onClick = { message = store.export(profile) }) {
+                    TextButton(onClick = {
+                        exporting = profile
+                        exporter.launch(exportFileName(profile))
+                    }) {
                         Text(stringResource(R.string.action_export))
                     }
                     TextButton(onClick = {
@@ -174,6 +196,7 @@ private fun DeploymentEditor(
     var locale by remember { mutableStateOf(profile.locale) }
     var timeZone by remember { mutableStateOf(profile.timeZone) }
     var shade by remember { mutableStateOf(profile.showNotificationShade) }
+    var networks by remember { mutableStateOf(profile.wifiNetworks) }
 
     val hasPin = profile.adminPinHash.isNotEmpty() || pin.length >= AdminPin.MIN_LENGTH
     val valid = name.isNotBlank() && hasPin && packages.isNotEmpty()
@@ -258,6 +281,40 @@ private fun DeploymentEditor(
             modifier = Modifier.fillMaxWidth(),
         )
 
+        Text(stringResource(R.string.deployment_wifi), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.deployment_wifi_help), style = MaterialTheme.typography.bodySmall)
+        networks.forEachIndexed { index, network ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = network.ssid,
+                    onValueChange = { networks = networks.replacing(index, network.copy(ssid = it)) },
+                    label = { Text(stringResource(R.string.deployment_wifi_ssid)) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).testTag("wifi-ssid-$index"),
+                )
+                OutlinedTextField(
+                    value = network.passphrase.orEmpty(),
+                    onValueChange = {
+                        networks = networks.replacing(index, network.copy(passphrase = it))
+                    },
+                    label = { Text(stringResource(R.string.deployment_wifi_passphrase)) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).testTag("wifi-passphrase-$index"),
+                )
+                TextButton(
+                    onClick = { networks = networks.filterIndexed { i, _ -> i != index } },
+                    modifier = Modifier.testTag("wifi-remove-$index"),
+                ) { Text(stringResource(R.string.action_delete)) }
+            }
+        }
+        OutlinedButton(
+            onClick = { networks = networks + WifiNetwork(ssid = "") },
+            modifier = Modifier.testTag(TAG_EDITOR_WIFI_ADD),
+        ) { Text(stringResource(R.string.deployment_wifi_add)) }
+
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Switch(
                 checked = shade,
@@ -311,6 +368,9 @@ private fun DeploymentEditor(
                             locale = locale.trim(),
                             timeZone = timeZone.trim(),
                             showNotificationShade = shade,
+                            wifiNetworks = networks
+                                .map { it.copy(ssid = it.ssid.trim()) }
+                                .filter { it.ssid.isNotEmpty() },
                         ),
                     )
                 },
@@ -321,6 +381,14 @@ private fun DeploymentEditor(
     }
 }
 
+private fun List<WifiNetwork>.replacing(index: Int, network: WifiNetwork): List<WifiNetwork> =
+    mapIndexed { i, existing -> if (i == index) network else existing }
+
+private fun exportFileName(profile: DeploymentProfile): String {
+    val name = profile.name.map { if (it.isLetterOrDigit()) it else '-' }.joinToString("")
+    return "${name.ifBlank { "deployment" }}.json"
+}
+
 const val TAG_NEW_DEPLOYMENT = "deployments-new"
 const val TAG_IMPORT = "deployments-import"
 const val TAG_DEPLOYMENTS_EMPTY = "deployments-empty"
@@ -328,5 +396,6 @@ const val TAG_EDITOR = "deployment-editor"
 const val TAG_EDITOR_NAME = "deployment-name"
 const val TAG_EDITOR_PIN = "deployment-pin"
 const val TAG_EDITOR_SHADE = "deployment-shade"
+const val TAG_EDITOR_WIFI_ADD = "deployment-wifi-add"
 const val TAG_SHADE_WARNING = "deployment-shade-warning"
 const val TAG_EDITOR_SAVE = "deployment-save"

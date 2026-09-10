@@ -29,15 +29,6 @@ class SessionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_STOP -> {
-                session.stop()
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
-                return START_NOT_STICKY
-            }
-        }
-
         val profileId = intent?.getStringExtra(EXTRA_PROFILE_ID)
         val manual = intent?.getBooleanExtra(EXTRA_MANUAL, false) == true
         val profile = profileId?.let { ProfileStore(this).get(it) }
@@ -91,7 +82,6 @@ class SessionService : Service() {
         private const val EXTRA_MANUAL = "manual"
         private const val EXTRA_SSID = "ssid"
         private const val EXTRA_PASSPHRASE = "passphrase"
-        private const val ACTION_STOP = "org.awana.provision.STOP_SESSION"
 
         /**
          * One session at a time, shared between the service and the UI. A
@@ -123,10 +113,11 @@ class SessionService : Service() {
             )
         }
 
+        // stopService rather than a stop action: startService throws once the
+        // app is in the background, and onDestroy already ends the session.
         fun stop(context: Context) {
-            context.startService(
-                Intent(context, SessionService::class.java).setAction(ACTION_STOP),
-            )
+            if (::session.isInitialized) session.stop()
+            context.stopService(Intent(context, SessionService::class.java))
         }
     }
 }

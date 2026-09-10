@@ -134,27 +134,30 @@ class ApkLibrary(context: Context) {
         index.writeText(Json.encodeList(entries.sortedBy { it.label }))
     }
 
-    /**
-     * Only runtime ("dangerous") permissions can be pre-granted by a Device
-     * Owner, and background location is refused unless foreground location was
-     * granted first, so that pair is ordered here.
-     */
+    /** Only runtime ("dangerous") permissions can be pre-granted by a Device Owner. */
     private fun runtimePermissions(requested: List<String>): List<String> {
         val pm = appContext.packageManager
-        val runtime = requested.filter { name ->
-            runCatching { pm.getPermissionInfo(name, 0).protection == PermissionInfo.PROTECTION_DANGEROUS }
-                .getOrDefault(false)
-        }
-        val foregroundLocation = listOf(
-            android.Manifest.permission.ACCESS_FINE_LOCATION,
-            android.Manifest.permission.ACCESS_COARSE_LOCATION,
+        return orderedForGrant(
+            requested.filter { name ->
+                runCatching {
+                    pm.getPermissionInfo(name, 0).protection == PermissionInfo.PROTECTION_DANGEROUS
+                }.getOrDefault(false)
+            },
         )
-        return runtime.filter { it in foregroundLocation } + runtime.filterNot { it in foregroundLocation }
     }
 
     private companion object {
         const val TAG = "ApkLibrary"
     }
+}
+
+/** Background location is refused unless foreground location was granted first. */
+internal fun orderedForGrant(runtime: List<String>): List<String> {
+    val foregroundLocation = setOf(
+        android.Manifest.permission.ACCESS_FINE_LOCATION,
+        android.Manifest.permission.ACCESS_COARSE_LOCATION,
+    )
+    return runtime.filter { it in foregroundLocation } + runtime.filterNot { it in foregroundLocation }
 }
 
 class ApkImportError(message: String) : Exception(message)

@@ -38,6 +38,15 @@
     <string name="deployment_shade_off_help">Off is the normal setting. The battery and signal icons stay visible, but the shade cannot be pulled down, so mobile data and airplane mode cannot be changed by accident.</string>
     <string name="deployment_shade_on_warning">Turning this on has three costs:</string>
     <string name="deployment_no_apps">Add apps in the Apps tab first.</string>
+    <string name="deployment_wifi">Wi-Fi networks for these devices</string>
+    <string name="deployment_wifi_help">Devices join these networks on their own. Add the team\'s sync network here — people using a device cannot add one themselves without the admin PIN.</string>
+    <string name="deployment_wifi_ssid">Network name</string>
+    <string name="deployment_wifi_passphrase">Password (leave empty for an open network)</string>
+    <string name="deployment_wifi_add">Add a Wi-Fi network</string>
+    <string name="deployment_export_saved">Saved this deployment to the file you chose.</string>
+    <string name="deployment_export_failed">That deployment could not be saved there. Choose another folder and try again.</string>
+    <string name="deployment_import_unreadable">That file could not be read. Choose the deployment file you were sent.</string>
+    <string name="deployment_import_not_a_deployment">That file is not a deployment. Choose the file a colleague exported from this app.</string>
 
     <string name="apps_title">Apps</string>
     <string name="apps_empty">No apps yet. Add the APK files you want to install on devices.</string>
@@ -62,10 +71,13 @@
     <string name="session_manual_help">If this phone cannot start a hotspot on its own, turn on the hotspot in Settings, then type its name and password here.</string>
     <string name="session_manual_ssid">Hotspot name</string>
     <string name="session_manual_passphrase">Hotspot password</string>
+    <string name="session_permission_refused">To start its own hotspot this phone needs the nearby Wi-Fi permission. Allow it in Settings, or set the hotspot up by hand below.</string>
     <string name="session_qr_too_big">This deployment does not fit in a code a phone camera can read reliably. Remove some apps, or shorten the deployment name.</string>
 
+    <string name="report_device">%1$s · %2$s %3$s</string>
     <string name="report_ok">Set up</string>
     <string name="report_failed">Had problems</string>
+    <string name="report_permission_failed">Allow this by hand on the device: %1$s</string>
     <string name="report_battery_warning">This make of phone needs its battery settings changed by hand, or its apps will be stopped in the background.</string>
 
     <string name="help_title">Setting up a phone</string>
@@ -75,5 +87,6 @@
     <string name="help_step4">4. The phone opens a camera. Point it at the square code.</string>
     <string name="help_step5">5. The phone joins this phone\'s hotspot and installs everything. Leave the two phones near each other.</string>
     <string name="help_step6">6. When it finishes, the phone shows the kiosk home screen and appears in the list here.</string>
+    <string name="help_wifi">Before you start, disconnect this phone from any Wi-Fi network. If it stays joined to one, the code can send the new phones to the wrong address and they will wait forever.</string>
     <string name="help_power">Bring a power bank. Running the hotspot and sending the apps drains this phone quickly — that, rather than speed, is what limits how many phones you can do in one go.</string>
 </resources>

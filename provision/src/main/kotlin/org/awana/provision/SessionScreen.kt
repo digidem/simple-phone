@@ -1,5 +1,11 @@
 package org.awana.provision
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -46,11 +52,28 @@ import androidx.compose.ui.unit.dp
 fun SessionScreen(profileId: String, onFinished: () -> Unit) {
     val context = LocalContext.current
     val state by SessionService.session.state.collectAsState()
+    var permissionRefused by remember { mutableStateOf(false) }
+
+    val request = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { results ->
+        // The notification permission is asked for at the same time but is not
+        // required: without it the session simply runs without its notification.
+        if (results[hotspotPermission()] == true) SessionService.start(context, profileId)
+        else permissionRefused = true
+    }
 
     // Starting the session is a side effect, so it belongs in a LaunchedEffect
-    // rather than in composition. Keyed on the profile so re-composition does
-    // not restart the hotspot.
-    LaunchedEffect(profileId) { SessionService.start(context, profileId) }
+    // rather than in composition. A session already running for this profile is
+    // left alone: restarting it would tear the hotspot down under the device
+    // being enrolled.
+    LaunchedEffect(profileId) {
+        when {
+            SessionService.session.isActiveFor(profileId) -> Unit
+            hasPermission(context, hotspotPermission()) -> SessionService.start(context, profileId)
+            else -> request.launch(sessionPermissions())
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -63,9 +86,10 @@ fun SessionScreen(profileId: String, onFinished: () -> Unit) {
         val payload = state.qrPayload
 
         when {
-            error != null -> ManualFallback(
-                message = error,
+            error != null || permissionRefused -> ManualFallback(
+                message = error ?: stringResource(R.string.session_permission_refused),
                 onStart = { ssid, passphrase ->
+                    permissionRefused = false
                     SessionService.startManual(context, profileId, ssid, passphrase)
                 },
                 onCancel = {
@@ -172,7 +196,16 @@ private fun Dashboard(state: SessionState) {
     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
         state.reports.forEach { report ->
             ListItem(
-                headlineContent = { Text("${report.manufacturer} ${report.model}") },
+                headlineContent = {
+                    Text(
+                        stringResource(
+                            R.string.report_device,
+                            report.deviceLabel,
+                            report.manufacturer,
+                            report.model,
+                        ),
+                    )
+                },
                 supportingContent = {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
@@ -189,6 +222,12 @@ private fun Dashboard(state: SessionState) {
                         }
                         report.failures.forEach {
                             Text(it, style = MaterialTheme.typography.bodySmall)
+                        }
+                        report.permissionFailures.forEach {
+                            Text(
+                                text = stringResource(R.string.report_permission_failed, it),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                         }
                         if (report.hostileOem != null) {
                             Text(
@@ -251,6 +290,28 @@ private fun ManualFallback(
         }
     }
 }
+
+/**
+ * `startLocalOnlyHotspot` is refused outright without this, which is what made
+ * every session fall through to the manual hotspot. The permission it wants
+ * changed name at API 33.
+ */
+private fun hotspotPermission(): String =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.NEARBY_WIFI_DEVICES
+    } else {
+        Manifest.permission.ACCESS_FINE_LOCATION
+    }
+
+private fun sessionPermissions(): Array<String> =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        arrayOf(hotspotPermission(), Manifest.permission.POST_NOTIFICATIONS)
+    } else {
+        arrayOf(hotspotPermission())
+    }
+
+private fun hasPermission(context: Context, permission: String): Boolean =
+    context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
 const val TAG_SESSION = "session"
 const val TAG_QR = "session-qr"

@@ -42,6 +42,14 @@ fun HelpScreen(modifier: Modifier = Modifier) {
 
         Card(modifier = Modifier.padding(top = 16.dp)) {
             Text(
+                text = stringResource(R.string.help_wifi),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+
+        Card {
+            Text(
                 text = stringResource(R.string.help_power),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(16.dp),

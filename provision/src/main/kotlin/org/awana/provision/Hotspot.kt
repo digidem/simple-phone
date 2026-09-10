@@ -139,7 +139,12 @@ class ManualHotspot(
                         "then come back.",
                 ),
             )
-        return Result.success(details.copy(gatewayAddress = gateway))
+        val security = if (details.passphrase.isBlank()) {
+            HotspotDetails.SECURITY_NONE
+        } else {
+            HotspotDetails.SECURITY_WPA
+        }
+        return Result.success(details.copy(gatewayAddress = gateway, securityType = security))
     }
 
     override fun stop() = Unit
@@ -155,10 +160,23 @@ internal fun localAddress(): String? =
     NetworkInterface.getNetworkInterfaces().toList()
         .asSequence()
         .filter { it.isUp && !it.isLoopback }
-        // Tethering interfaces first: on a phone that also has mobile data up,
-        // rmnet would otherwise win and the address would be unreachable.
-        .sortedBy { if (it.name.startsWith("wlan") || it.name.startsWith("ap")) 0 else 1 }
+        .sortedBy { interfaceRank(it.name.orEmpty()) }
         .flatMap { it.inetAddresses.toList().asSequence() }
         .filterIsInstance<Inet4Address>()
         .firstOrNull { !it.isLoopbackAddress && it.isSiteLocalAddress }
         ?.hostAddress
+
+private val TETHERED_WLAN = Regex("wlan[1-9]\\d*")
+
+/**
+ * Lower sorts first. A trainer phone joined to a Wi-Fi network as a client
+ * holds a site-local address on `wlan0` that no enrolling phone can reach, so
+ * the interface the hotspot actually runs on has to win: `ap0` on most phones,
+ * `swlan0` on Samsung, `wlan1` where the radio is shared.
+ */
+internal fun interfaceRank(name: String): Int = when {
+    name.startsWith("ap") || name.startsWith("swlan") -> 0
+    name.matches(TETHERED_WLAN) -> 0
+    name.startsWith("wlan") -> 1
+    else -> 2
+}

@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
 import org.awana.kiosk.shared.AdminPin
+import org.awana.kiosk.shared.WifiNetwork
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -53,6 +54,28 @@ class LibraryAndProfileTest {
         val readable = entry.readableFingerprint
         assertEquals(entry.certSha256, readable.replace(" ", ""))
         assertTrue(readable.contains(" "))
+    }
+
+    @Test
+    fun theRuntimePermissionsAnApkAsksForAreRecordedInGrantOrder() = runBlocking {
+        val entry = ApkLibrary(context).add(File(context.applicationInfo.sourceDir).toUri()).getOrThrow()
+
+        // This app asks for fine location so it can start a hotspot, and that
+        // is a runtime permission, so it has to be carried to the kiosk.
+        assertTrue(
+            "recorded ${entry.permissions}",
+            android.Manifest.permission.ACCESS_FINE_LOCATION in entry.permissions,
+        )
+        // Only runtime permissions: a Device Owner cannot pre-grant the rest.
+        assertFalse(android.Manifest.permission.INTERNET in entry.permissions)
+        // Foreground location first, because the background grant is refused
+        // unless the foreground one has already been made.
+        val background = entry.permissions.indexOf(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        if (background >= 0) {
+            assertTrue(
+                entry.permissions.indexOf(android.Manifest.permission.ACCESS_FINE_LOCATION) < background,
+            )
+        }
     }
 
     @Test
@@ -148,6 +171,24 @@ class LibraryAndProfileTest {
         // A new id, so importing a colleague's export cannot silently overwrite
         // a local profile that happens to share one.
         assertNotEquals(original.id, imported.id)
+    }
+
+    @Test
+    fun preApprovedWifiNetworksSurviveStorageAndExport() {
+        val store = ProfileStore(context)
+        val networks = listOf(
+            WifiNetwork("Sync network", "correcthorsebattery"),
+            WifiNetwork("Open network", null),
+        )
+        val original = profile().copy(wifiNetworks = networks)
+
+        store.save(original)
+        val imported = store.import(store.export(original)).getOrThrow()
+
+        // Without these a deployed device can never join a network again: users
+        // cannot configure Wi-Fi themselves.
+        assertEquals(networks, store.get(original.id)?.wifiNetworks)
+        assertEquals(networks, imported.wifiNetworks)
     }
 
     @Test
