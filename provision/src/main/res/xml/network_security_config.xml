@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  This app *is* the plain-HTTP server devices fetch their payload from. There is
+  no certificate to present on a local-only hotspot, and integrity comes from the
+  signature checksum in the QR and the kiosk's own certificate checks.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

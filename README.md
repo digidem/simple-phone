@@ -54,14 +54,14 @@ avdmanager create avd -n kiosk_aosp_30 \
 emulator -avd kiosk_aosp_30 -no-snapshot -no-boot-anim -no-audio &
 
 ./gradlew :app:installDebug
-adb shell dpm set-device-owner app.comapeo.kiosk/.KioskDeviceAdminReceiver
+adb shell dpm set-device-owner org.awana.kiosk/.KioskDeviceAdminReceiver
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
 To undo, either use **Remove the lock from this device** in the admin screen or:
 
 ```sh
-adb shell dpm remove-active-admin app.comapeo.kiosk/.KioskDeviceAdminReceiver
+adb shell dpm remove-active-admin org.awana.kiosk/.KioskDeviceAdminReceiver
 ```
 
 ## Testing on hardware

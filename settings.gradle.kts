@@ -14,11 +14,18 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "comapeo-kiosk"
+rootProject.name = "field-kiosk"
 
-include(":app")
-include(":policy")
-include(":launcher")
+// The wire protocol between the two apps: config, report, PIN hash, certificates.
+include(":shared")
+
+// The Device Owner app installed on every field device.
+include(":kiosk:app")
+include(":kiosk:policy")
+include(":kiosk:launcher")
+
+// The trainer's app that provisions field devices over a hotspot.
+include(":provision")
 
 // Not shipped. A real APK for the end-to-end provisioning test to install.
 include(":sample")

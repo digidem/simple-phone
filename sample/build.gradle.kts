@@ -11,11 +11,11 @@ plugins {
  * this — it exists only so `:app`'s androidTest has something to install.
  */
 android {
-    namespace = "app.comapeo.kiosk.sample"
+    namespace = "org.awana.kiosk.sample"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "app.comapeo.kiosk.sample"
+        applicationId = "org.awana.kiosk.sample"
         minSdk = 30
         targetSdk = 36
         versionCode = 1

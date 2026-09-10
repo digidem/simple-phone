@@ -28,7 +28,7 @@ freshly-reset phone with no accounts added:
 
 ```sh
 adb install app-debug.apk
-adb shell dpm set-device-owner app.comapeo.kiosk/.KioskDeviceAdminReceiver
+adb shell dpm set-device-owner org.awana.kiosk/.KioskDeviceAdminReceiver
 ```
 
 ---

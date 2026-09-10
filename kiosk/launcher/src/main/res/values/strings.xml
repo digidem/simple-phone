@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="launcher_empty">No apps have been set up on this device yet.</string>
+
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_back">Back</string>
+    <string name="action_save">Save</string>
+    <string name="action_install">Install</string>
+    <string name="action_unlock">Unlock for 10 minutes</string>
+    <string name="action_unprovision">Remove the lock</string>
+
+    <string name="pin_title">Enter the admin PIN</string>
+    <string name="pin_wrong">That PIN is not correct.</string>
+    <string name="pin_no_config">This device has not been set up, so there is no PIN to check.</string>
+    <string name="pin_locked_out">Too many wrong tries. Wait %1$d seconds.</string>
+    <string name="pin_new">New PIN</string>
+    <string name="pin_confirm">Enter the new PIN again</string>
+    <string name="pin_too_short">The PIN must be at least %1$d digits.</string>
+    <string name="pin_mismatch">The two PINs do not match.</string>
+    <string name="pin_changed">The admin PIN has been changed.</string>
+
+    <string name="admin_title">Admin</string>
+    <string name="admin_device_info">Device information</string>
+    <string name="admin_visible_apps">Apps shown on the home screen</string>
+    <string name="admin_change_pin">Change the admin PIN</string>
+    <string name="admin_wifi">Wi-Fi</string>
+    <string name="admin_reapply_policy">Re-apply the lock settings</string>
+    <string name="admin_install_url">Install an app from a web address</string>
+    <string name="admin_unlock_temporarily">Unlock this device temporarily</string>
+    <string name="admin_unprovision">Remove the lock from this device</string>
+    <string name="admin_working">%1$s…</string>
+    <string name="admin_no_config">This device has not been set up.</string>
+    <string name="admin_not_device_owner">This app is not the device owner, so it cannot change the lock settings. The device needs to be set up again from the trainer\'s phone.</string>
+    <string name="admin_reapply_ok">Done. %1$d groups of settings were applied.</string>
+    <string name="admin_reapply_partial">Some settings could not be applied: %1$s</string>
+
+    <string name="admin_unlock_explain">The home screen lock will be turned off so you can use the rest of the device. It will turn itself back on after 10 minutes, so the device cannot be left unlocked by accident.</string>
+    <string name="admin_unprovision_explain">This turns the device back into a normal Android phone. The home screen lock is removed, apps can be uninstalled again, and settings are no longer protected.\n\nThis cannot be undone. Putting the lock back requires erasing the phone completely and setting it up again from the trainer\'s phone.</string>
+
+    <string name="info_manufacturer">Make</string>
+    <string name="info_model">Model</string>
+    <string name="info_android">Android version</string>
+    <string name="info_kiosk_version">Kiosk version</string>
+    <string name="info_build_variant">Signing key</string>
+    <string name="info_app_version">Installed app</string>
+    <string name="info_deployment">Deployment</string>
+    <string name="info_deployment_id">Deployment ID</string>
+    <string name="info_device_owner">Device owner</string>
+    <string name="info_hostile_oem">Battery settings need a manual step on this make</string>
+    <string name="info_last_failures">Problems during setup</string>
+
+    <string name="wifi_enabled">Wi-Fi on</string>
+    <string name="wifi_ssid">Network name</string>
+    <string name="wifi_passphrase">Password (leave empty if the network is open)</string>
+    <string name="wifi_add">Add this network</string>
+    <string name="wifi_added">Added %1$s.</string>
+    <string name="wifi_add_failed">The network could not be added. This only works when the kiosk app is the device owner.</string>
+
+    <string name="install_url_explain">The device must be connected to a network for this. The app you install must be signed with the same key as the one recorded for it, or it will be refused.</string>
+    <string name="install_url_label">Web address of the APK file</string>
+    <string name="install_package_label">App package name (for example org.example.app)</string>
+</resources>

@@ -3,15 +3,16 @@
 Guidance for coding agents working in `comapeo-kiosk`.
 
 An Android **Device Owner** app: a locked-down launcher for CoMapeo deployments
-on budget phones handed to non-technical, sometimes non-literate users. The full
-specification is `/Users/gregor/Downloads/comapeo-kiosk-handoff.md`; running
-notes and phase status are in `PROGRESS.md`.
+on budget phones handed to non-technical, sometimes non-literate users. The original
+specification is `docs/handoff-spec.md`; running notes and phase status are in
+`PROGRESS.md`.
 
 ## Commands
 
 ```sh
-./gradlew :app:assembleDebug          # build
-./gradlew :policy:assembleDebug       # policy module alone
+./gradlew :kiosk:app:assembleDebug    # the device app
+./gradlew :provision:assembleDebug    # the trainer app (bundles the kiosk APK)
+./gradlew :provision:testDebugUnitTest # JVM tests: QR payload
 tools/test.sh                         # the whole instrumented suite, both emulators
 tools/dev-keys.sh                     # dev keystore + v3 lineage, both gitignored
 ```
@@ -21,10 +22,10 @@ resolve them by AVD name rather than assuming a port:
 
 ```sh
 SERIAL=$(tools/test.sh --serial kiosk_aosp_30)
-ANDROID_SERIAL=$SERIAL ./gradlew :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=app.comapeo.kiosk.PolicyTest
-ANDROID_SERIAL=$SERIAL ./gradlew :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=app.comapeo.kiosk.PolicyTest#provisionIsIdempotent
+ANDROID_SERIAL=$SERIAL ./gradlew :kiosk:app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=org.awana.kiosk.PolicyTest
+ANDROID_SERIAL=$SERIAL ./gradlew :kiosk:app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=org.awana.kiosk.PolicyTest#provisionIsIdempotent
 ```
 
 Gradle prints only a pass/fail count. For failure messages, read the XML:
@@ -32,7 +33,7 @@ Gradle prints only a pass/fail count. For failure messages, read the XML:
 ```sh
 python3 -c "
 import glob, xml.etree.ElementTree as ET
-for f in glob.glob('app/build/outputs/androidTest-results/connected/debug/*.xml'):
+for f in glob.glob('kiosk/app/build/outputs/androidTest-results/connected/debug/*.xml'):
     r = ET.parse(f).getroot()
     for tc in r.iter('testcase'):
         for fa in list(tc): print(tc.get('name'), (fa.text or '')[:600])
@@ -60,16 +61,24 @@ Making the device owner, once, after `kiosk_aosp_30` boots:
 
 ```sh
 adb -s "$(tools/test.sh --serial kiosk_aosp_30)" shell dpm set-device-owner \
-  app.comapeo.kiosk/.KioskDeviceAdminReceiver
+  org.awana.kiosk/.KioskDeviceAdminReceiver
 ```
 
 ## Architecture
 
+One Gradle build, both apps:
+
 ```
-policy/     DevicePolicyManager wrapper, config, installer, provisioning. No UI deps.
-launcher/   HOME activity, icon grid, PIN, admin screen.
-app/        Assembly: KioskApp, the DeviceAdminReceiver, the boot receiver.
+shared/           Wire protocol both apps compile: KioskConfig, EnrolmentReport, AdminPin, Certificates.
+kiosk/policy/     DevicePolicyManager wrapper, installer, provisioning. No UI deps.
+kiosk/launcher/   HOME activity, icon grid, PIN, admin screen.
+kiosk/app/        Assembly: the DeviceAdminReceiver, the boot receiver, the provisioning service.
+provision/        The trainer app: APK library, profiles, hotspot, server, QR, dashboard.
+sample/           Not shipped; a real APK for the end-to-end test to install.
 ```
+
+`:provision` bundles the kiosk APK of the same build type from `:kiosk:app`
+via a Gradle task, so there is no script to run and no asset to commit.
 
 The seam that makes everything testable: **`onProfileProvisioningComplete` is a
 thin wrapper over `Provisioner.provision(config)` and nothing else.** Tests call
@@ -81,9 +90,9 @@ setup wizard. Do not grow logic into the receiver.
 `PackageManager` for the receiver in this package, so `:policy` needs no
 compile-time dependency on `:app`, which declares it.
 
-Wiring is manual in `KioskApp`. There is not enough of it for a DI framework,
-and the maintaining team works in React Native, not Kotlin. Prefer boring code;
-every dependency is a maintenance liability.
+There is no DI framework and no Application subclass: classes construct their
+few collaborators directly. The maintaining team works in React Native, not
+Kotlin. Prefer boring code; every dependency is a maintenance liability.
 
 ## Things that look like bugs but are deliberate
 

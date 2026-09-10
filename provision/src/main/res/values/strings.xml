@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Field Kiosk Setup</string>
+
+    <string name="session_notification_title">Setting up devices</string>
+    <string name="session_notification_body">Hotspot on for “%1$s”. Keep this screen nearby.</string>
+
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_back">Back</string>
+    <string name="action_save">Save</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_duplicate">Make a copy</string>
+    <string name="action_export">Export</string>
+    <string name="action_import">Import</string>
+    <string name="action_add">Add</string>
+
+    <string name="tab_deployments">Deployments</string>
+    <string name="tab_apps">Apps</string>
+    <string name="tab_help">How to</string>
+
+    <string name="deployments_title">Deployments</string>
+    <string name="deployments_empty">No deployments yet. Create one to get started.</string>
+    <string name="deployments_new">New deployment</string>
+    <string name="deployment_start">Start setting up devices</string>
+    <string name="deployment_name">Name of this deployment</string>
+    <string name="deployment_pin">Admin PIN for these devices</string>
+    <string name="deployment_pin_help">Trainers use this PIN to unlock the settings screen on a device. Write it down: it cannot be read back from here.</string>
+    <string name="deployment_pin_unchanged">The PIN is already set. Type a new one only if you want to change it.</string>
+    <string name="deployment_apps">Apps to install</string>
+    <string name="deployment_apps_help">Ticked apps are installed and protected. Use the second tick to also show an app on the home screen — an app can be installed as a share target without appearing there.</string>
+    <string name="deployment_show_on_home">Show on home screen</string>
+    <string name="deployment_locale">Language</string>
+    <string name="deployment_timezone">Time zone</string>
+    <string name="deployment_screen_timeout">Screen turns off after</string>
+    <string name="deployment_shade">Allow the notification shade</string>
+    <string name="deployment_shade_off_help">Off is the normal setting. The battery and signal icons stay visible, but the shade cannot be pulled down, so mobile data and airplane mode cannot be changed by accident.</string>
+    <string name="deployment_shade_on_warning">Turning this on has three costs:</string>
+    <string name="deployment_no_apps">Add apps in the Apps tab first.</string>
+
+    <string name="apps_title">Apps</string>
+    <string name="apps_empty">No apps yet. Add the APK files you want to install on devices.</string>
+    <string name="apps_add">Add an APK file</string>
+    <string name="apps_fingerprint">Signing fingerprint</string>
+    <string name="apps_fingerprint_help">Check this matches what you expect before deploying to a whole team. A device will refuse an app whose fingerprint does not match.</string>
+    <string name="apps_version">Version %1$s (%2$d)</string>
+    <string name="apps_size">%1$d MB</string>
+    <string name="apps_remove">Remove from library</string>
+    <string name="apps_added">Added %1$s.</string>
+
+    <string name="session_title">Setting up devices</string>
+    <string name="session_scan">On the new phone, tap the first screen six times, then scan this code.</string>
+    <string name="session_requires_android9">The phone must be freshly reset, and running Android 9 or newer.</string>
+    <string name="session_network">Hotspot: %1$s</string>
+    <string name="session_server">Server: %1$s</string>
+    <string name="session_progress">%1$d of %2$d set up</string>
+    <string name="session_waiting">Waiting for the first device…</string>
+    <string name="session_stop">Stop and turn off the hotspot</string>
+    <string name="session_safe_to_stop">All the devices you set up have reported back. It is safe to stop.</string>
+    <string name="session_manual_title">Set the hotspot up by hand</string>
+    <string name="session_manual_help">If this phone cannot start a hotspot on its own, turn on the hotspot in Settings, then type its name and password here.</string>
+    <string name="session_manual_ssid">Hotspot name</string>
+    <string name="session_manual_passphrase">Hotspot password</string>
+    <string name="session_qr_too_big">This deployment does not fit in a code a phone camera can read reliably. Remove some apps, or shorten the deployment name.</string>
+
+    <string name="report_ok">Set up</string>
+    <string name="report_failed">Had problems</string>
+    <string name="report_battery_warning">This make of phone needs its battery settings changed by hand, or its apps will be stopped in the background.</string>
+
+    <string name="help_title">Setting up a phone</string>
+    <string name="help_step1">1. Start a deployment on this phone. A square code appears.</string>
+    <string name="help_step2">2. Factory reset the new phone, or take it out of the box.</string>
+    <string name="help_step3">3. On its first “Hello” screen, tap the middle of the screen six times.</string>
+    <string name="help_step4">4. The phone opens a camera. Point it at the square code.</string>
+    <string name="help_step5">5. The phone joins this phone\'s hotspot and installs everything. Leave the two phones near each other.</string>
+    <string name="help_step6">6. When it finishes, the phone shows the kiosk home screen and appears in the list here.</string>
+    <string name="help_power">Bring a power bank. Running the hotspot and sending the apps drains this phone quickly — that, rather than speed, is what limits how many phones you can do in one go.</string>
+</resources>

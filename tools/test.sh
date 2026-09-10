@@ -18,7 +18,7 @@
 #
 # Make the first one Device Owner once, after it boots:
 #   adb -s "$(./tools/test.sh --serial kiosk_aosp_30)" shell dpm set-device-owner \
-#     app.comapeo.kiosk/.KioskDeviceAdminReceiver
+#     org.awana.kiosk/.KioskDeviceAdminReceiver
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -50,9 +50,9 @@ if [ -z "$DO_SERIAL" ]; then
 fi
 
 echo "== policy and lock task on $DO_SERIAL (kiosk_aosp_30) =="
-ANDROID_SERIAL="$DO_SERIAL" ./gradlew :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.package=app.comapeo.kiosk \
-  -Pandroid.testInstrumentationRunnerArguments.notPackage=app.comapeo.kiosk.launcher
+ANDROID_SERIAL="$DO_SERIAL" ./gradlew :kiosk:app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.package=org.awana.kiosk \
+  -Pandroid.testInstrumentationRunnerArguments.notPackage=org.awana.kiosk.launcher
 
 if [ -z "$UI_SERIAL" ]; then
   echo
@@ -62,5 +62,8 @@ if [ -z "$UI_SERIAL" ]; then
 fi
 
 echo "== launcher UI on $UI_SERIAL (kiosk_ui_30) =="
-ANDROID_SERIAL="$UI_SERIAL" ./gradlew :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.package=app.comapeo.kiosk.launcher
+ANDROID_SERIAL="$UI_SERIAL" ./gradlew :kiosk:app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.package=org.awana.kiosk.launcher
+
+echo "== provision app on $UI_SERIAL (kiosk_ui_30) =="
+ANDROID_SERIAL="$UI_SERIAL" ./gradlew :provision:testDebugUnitTest :provision:connectedDebugAndroidTest

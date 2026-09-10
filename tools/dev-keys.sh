@@ -8,11 +8,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-STORE=comapeo-kiosk-dev.jks
-NEXT=comapeo-kiosk-dev-next.jks
-LINEAGE=comapeo-kiosk-dev.lineage
+STORE=kiosk-dev.jks
+NEXT=kiosk-dev-next.jks
+LINEAGE=kiosk-dev.lineage
 PASS=devdevdev
-DNAME="CN=CoMapeo Kiosk (development), O=Awana Digital, C=US"
+DNAME="CN=Field Kiosk (development), O=Awana Digital, C=US"
 
 if [ -f "$STORE" ]; then
   echo "$STORE already exists; leaving it alone."

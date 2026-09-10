@@ -44,7 +44,7 @@ keytool -genkeypair -v \
   -keystore comapeo-kiosk-release.jks \
   -alias kiosk \
   -keyalg RSA -keysize 4096 -validity 10950 \
-  -dname "CN=CoMapeo Kiosk, O=Awana Digital, C=US"
+  -dname "CN=Field Kiosk, O=Awana Digital, C=US"
 ```
 
 Then create `keystore.properties` in the repository root — it is gitignored:
