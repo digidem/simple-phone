@@ -1,6 +1,6 @@
 <!-- The original implementation handoff, kept for the record. It predates the
-     generic rename and the fetched-config design; PROGRESS/CONTRIBUTING describe
-     what was actually built. -->
+     generic rename and the fetched-config design; CONTRIBUTING.md describes what
+     was actually built. -->
 
 # CoMapeo Kiosk & Provisioning — Implementation Handoff
 

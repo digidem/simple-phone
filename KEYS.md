@@ -1,8 +1,9 @@
 # Signing keys and custody
 
-One key signs both `comapeo-kiosk` and `comapeo-provision`. It is **separate
-from CoMapeo's key**, and neither app goes to Google Play, so there is no Play
-App Signing and no recovery path through Google.
+One key signs both Field Kiosk and Field Kiosk Setup, from one
+`keystore.properties` at the repository root. It is **separate from the key of
+any app a deployment installs**, and neither of these apps goes to Google Play,
+so there is no Play App Signing and no recovery path through Google.
 
 ## Why this key cannot be lost
 
@@ -29,7 +30,8 @@ record who holds them below.
 
 A device provisioned with a debug-signed kiosk can never receive production
 updates — the keys differ, so the update is refused. Test and production fleets
-must stay strictly separate.
+must stay strictly separate. The trainer's app bundles the kiosk APK of its own
+build type, so a debug Field Kiosk Setup provisions a debug fleet.
 
 The signing key is visible in the admin screen and in every enrolment report as
 `buildVariant`, which reads `sig:<first 16 hex of the cert SHA-256>`. Check it
@@ -41,16 +43,17 @@ Run this on an offline machine. Do not commit the result.
 
 ```sh
 keytool -genkeypair -v \
-  -keystore comapeo-kiosk-release.jks \
+  -keystore kiosk-release.jks \
   -alias kiosk \
   -keyalg RSA -keysize 4096 -validity 10950 \
   -dname "CN=Field Kiosk, O=Awana Digital, C=US"
 ```
 
-Then create `keystore.properties` in the repository root — it is gitignored:
+Then create `keystore.properties` in the repository root — it is gitignored, and
+both apps read it:
 
 ```properties
-storeFile=comapeo-kiosk-release.jks
+storeFile=kiosk-release.jks
 storePassword=…
 keyAlias=kiosk
 keyPassword=…
@@ -68,17 +71,17 @@ above is permanent.
 ```sh
 # One-off: create the lineage by "rotating" the original key to its successor.
 apksigner rotate \
-  --out comapeo-kiosk.lineage \
-  --old-signer --ks comapeo-kiosk-release.jks --ks-key-alias kiosk \
-  --new-signer --ks comapeo-kiosk-next.jks   --ks-key-alias kiosk-next
+  --out kiosk.lineage \
+  --old-signer --ks kiosk-release.jks --ks-key-alias kiosk \
+  --new-signer --ks kiosk-next.jks    --ks-key-alias kiosk-next
 ```
 
 Sign releases with the lineage attached:
 
 ```sh
 apksigner sign \
-  --ks comapeo-kiosk-release.jks --ks-key-alias kiosk \
-  --lineage comapeo-kiosk.lineage \
+  --ks kiosk-release.jks --ks-key-alias kiosk \
+  --lineage kiosk.lineage \
   --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled true \
   app-release.apk
 ```
@@ -92,6 +95,8 @@ Keep it alongside the keystore.
 
 ## Development
 
-`tools/dev-keys.sh` generates a local development keystore and lineage. Both are
-gitignored. They are for emulator and test-fleet work only and must never sign
-anything a partner organisation receives.
+`tools/dev-keys.sh` generates a local development keystore (`kiosk-dev.jks`),
+its rotation successor (`kiosk-dev-next.jks`) and a lineage
+(`kiosk-dev.lineage`), then writes `keystore.properties` pointing at them. All
+of it is gitignored. These keys are for emulator and test-fleet work only and
+must never sign anything a partner organisation receives.
