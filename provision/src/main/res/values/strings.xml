@@ -60,7 +60,7 @@
 
     <string name="session_title">Setting up devices</string>
     <string name="session_scan">On the new phone, tap the first screen six times, then scan this code.</string>
-    <string name="session_requires_android9">The phone must be freshly reset, and running Android 9 or newer.</string>
+    <string name="session_requires_android9">The phone must be freshly reset, and running Android 11 or newer.</string>
     <string name="session_network">Hotspot: %1$s</string>
     <string name="session_server">Server: %1$s</string>
     <string name="session_progress">%1$d of %2$d set up</string>

@@ -15,10 +15,10 @@ import java.io.File
 /**
  * The provisioning QR, against a fixture.
  *
- * `testdata/provisioning-qr.golden.json` is checked into **both** repositories:
- * this test generates it and the kiosk has a test that parses it. Change the
- * payload shape on one side and the other fails, which is what keeps the
- * duplicated payload types from drifting apart.
+ * This test generates `testdata/provisioning-qr.golden.json` and the kiosk's
+ * `GoldenPayloadTest` parses it exactly as the receiver would. The config and
+ * report types are shared code, so the QR shape is the only part of the wire
+ * format the type system does not cover.
  */
 class QrPayloadTest {
 

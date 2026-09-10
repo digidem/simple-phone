@@ -92,9 +92,11 @@ emulator -avd kiosk_aosp_30 -no-snapshot -no-boot-anim -no-audio &
 ```
 
 A freshly created AVD needs its screen kept awake once, or the lock task tests
-ANR when the screen sleeps mid-run:
+ANR when the screen sleeps mid-run. The AVD reports no power source, so
+`stayon` alone does nothing until one is faked:
 
 ```sh
+adb shell dumpsys battery set ac 1
 adb shell svc power stayon true
 ```
 
@@ -152,10 +154,10 @@ What the receiver does is read a bootstrap out of the provisioning extras and
 hand it to a foreground service, because a receiver's process can be killed the
 moment `onReceive` returns and the payload includes a download that can run to
 hundreds of megabytes. Two further activities exist only for the platform's
-provisioning handshake: `ACTION_GET_PROVISIONING_MODE`, which tells the setup
-wizard this app is asking to be a Device Owner, and
-`ACTION_ADMIN_POLICY_COMPLIANCE`, which the wizard shows while the policy is
-being applied.
+provisioning handshake, and neither draws anything: `ACTION_GET_PROVISIONING_MODE`
+answers that this app wants a fully managed device and hands the admin extras
+back, and `ACTION_ADMIN_POLICY_COMPLIANCE` returns at once, because the policy is
+applied by the service rather than in front of the wizard.
 
 `DevicePolicy` resolves its own admin `ComponentName` by querying
 `PackageManager` for the receiver in this package, so `:kiosk:policy` needs no
@@ -188,9 +190,11 @@ blocking unknown sources would break third-party self-updaters. Leaving the
 debugging restriction unset is not the same as having a recovery route, though:
 a QR-provisioned phone has USB debugging off and Developer options out of reach.
 
-**Network restrictions are applied last**, after install and reporting, not in
-one block up front — locking down Wi-Fi configuration must not disturb the
-hotspot the payload arrives over.
+**Network restrictions are applied last**, after the payload is installed and
+the deployment's networks are joined, not in one block up front — locking down
+Wi-Fi configuration must not disturb the hotspot the payload arrives over.
+`DevicePolicy.applyBeforeInstall` and `applyAfterInstall` are that split; the
+boot receiver and the admin re-apply run both back to back.
 
 **The kiosk joins the deployment's Wi-Fi networks itself, at provisioning.**
 With `DISALLOW_CONFIG_WIFI` set a user cannot add one, so without this a team's
@@ -242,9 +246,15 @@ itself, not from the transport. The hotspot has no certificate to present.
 **The gateway address is read, never hardcoded.** It is commonly `192.168.43.1`
 but varies by OEM.
 
-**`Hotspot` is an interface with a fake.** `startLocalOnlyHotspot` does not
-exist on an emulator, and its behaviour on budget phones is inconsistent enough
-that a manual fallback is needed in the field anyway.
+**`Hotspot` is an interface with a fake in the tests.** `startLocalOnlyHotspot`
+does not exist on an emulator, and its behaviour on budget phones is
+inconsistent enough that a manual fallback is needed in the field anyway.
+
+**The admin screen's list of saved Wi-Fi networks is empty on a real phone.**
+From Android 10 `getConfiguredNetworks` needs location permission, which the
+kiosk does not declare, Device Owner or not. Adding a network still works. The
+list would need `ACCESS_FINE_LOCATION` declared and self-granted at provisioning;
+that is a product decision, not an oversight.
 
 **`:sample` exists only to give the end-to-end test a real APK to install.** It
 is not shipped. The test cannot install the kiosk over itself mid-run, and a
