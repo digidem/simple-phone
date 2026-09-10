@@ -9,8 +9,8 @@ carry on. Update this file at every phase boundary and whenever you stop.
 
 ## Next step
 
-Phase 2 UI tests (launcher grid, hidden admin gesture, PIN), then phase 3 —
-the `comapeo-provision` app.
+Phase 3 - the `comapeo-provision` app. Scaffolding exists at
+`/Users/gregor/Dev/DdDev/comapeo-provision`; nothing is written yet.
 
 ## Established facts
 
@@ -50,6 +50,22 @@ Determined empirically this run; do not re-derive.
 7. The launcher loads its app list off the main thread and rasterises icons
    once, rather than doing disk and PackageManager work during composition.
 
+## Test emulators - two are needed
+
+On a device where the kiosk is Device Owner, the HOME activity and holding lock
+task, Compose's test harness sees **no compose hierarchy at all**: every UI test
+fails with "No compose hierarchies found", including a one-line smoke test.
+`ComposeSmokeTest` exists as a canary for exactly this, because the symptom
+reads like a bug in the screen under test.
+
+| AVD | Port | Role |
+|---|---|---|
+| `kiosk_aosp_30` | 5560 | Device Owner. Policy, lock task, install verification, PIN logic. |
+| `kiosk_ui_30` | 5562 | Clean. Compose UI tests only. |
+
+`tools/test.sh` runs both. Keep `kiosk_ui_30` shut down when not in use - each
+emulator costs about 20 GB.
+
 ## Answered by Gregor
 
 - Cert: pull from the v13.0 release APK (done, above).
@@ -67,5 +83,9 @@ Determined empirically this run; do not re-derive.
       Reboot survival confirmed by hand: after `adb reboot` the launcher is the
       resumed activity with `mLockTaskModeState=LOCKED`, and `BootReceiver`
       logs the policy re-application.
-- [ ] Phase 2 - launcher and admin screen (UI written, UI tests outstanding)
+- [x] **Phase 2 - launcher and admin screen.** 12 Compose UI tests green on
+      `kiosk_ui_30`, covering the icon grid, launch-on-tap, the empty state,
+      both admin-gesture timings (1s does nothing, 5s opens), the gesture having
+      no semantics to discover, PIN success and failure, the PIN never being
+      rendered in clear, keypad disabled during backoff, and cancel.
 - [ ] Phase 3 - provisioning app
