@@ -7,3 +7,4 @@ keystore.properties
 *.lineage
 .idea/
 .DS_Store
+!CLAUDE.md

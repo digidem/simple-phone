@@ -23,7 +23,7 @@ Determined empirically this run; do not re-derive.
 | CoMapeo v13.0 | versionCode 40, targetSdk 36, 186 MB |
 | APK shape | Single universal APK, arm64-v8a + armeabi-v7a. Not a split install, so §5.6's "known risk to test early" does not apply. |
 | Signature schemes | v2 + v3 (no v1 JAR signing) |
-| Test AVD | `kiosk_aosp_30` - AOSP (no GMS) API 30 arm64, port 5560 |
+| Test AVDs | `kiosk_aosp_30` (Device Owner) and `kiosk_ui_30` (clean), both AOSP API 30 arm64 |
 | `setApplicationExemptions` | Not in the public SDK; checked against `android-36/android.jar`. §5.4's "no DPM API for doze" stands. |
 
 ## Decisions taken beyond the spec
@@ -58,13 +58,13 @@ fails with "No compose hierarchies found", including a one-line smoke test.
 `ComposeSmokeTest` exists as a canary for exactly this, because the symptom
 reads like a bug in the screen under test.
 
-| AVD | Port | Role |
-|---|---|---|
-| `kiosk_aosp_30` | 5560 | Device Owner. Policy, lock task, install verification, PIN logic. |
-| `kiosk_ui_30` | 5562 | Clean. Compose UI tests only. |
+| AVD | Role |
+|---|---|
+| `kiosk_aosp_30` | Device Owner. Policy, lock task, install verification, PIN logic. |
+| `kiosk_ui_30` | Clean. Compose UI tests only. |
 
-`tools/test.sh` runs both. Keep `kiosk_ui_30` shut down when not in use - each
-emulator costs about 20 GB.
+`tools/test.sh` runs both. Serials are assigned by boot order, so it resolves
+them by AVD name; `tools/test.sh --serial <avd>` prints one.
 
 ## Answered by Gregor
 

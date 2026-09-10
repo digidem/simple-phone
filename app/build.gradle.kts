@@ -74,6 +74,12 @@ android {
         }
     }
 
+    sourceSets {
+        // The golden provisioning payload lives at the repository root because
+        // the same file is checked into comapeo-provision, which generates it.
+        getByName("androidTest").assets.srcDirs(rootProject.file("testdata"))
+    }
+
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
@@ -91,6 +97,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.work.runtime.ktx)
 
+    androidTestImplementation(libs.kotlinx.serialization.json)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.runner)
