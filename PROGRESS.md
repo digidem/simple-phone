@@ -55,10 +55,17 @@ Determined empirically this run; do not re-derive.
    via `Configuration.Provider`.
 7. The launcher loads its app list off the main thread and rasterises icons
    once, rather than doing disk and PackageManager work during composition.
-8. **The QR payload is encoded compactly, not pretty-printed.** A two-app
-   deployment came to 2218 bytes, past the point a budget phone camera reads
-   reliably in poor light; compact encoding brings it to 1579. A test asserts
-   the golden payload stays under the threshold.
+8. **The QR carries a bootstrap, not the config.** Embedded, the config grew
+   ~200 bytes per app: 2218 bytes for two apps pretty-printed, 1579 compact,
+   and past QR capacity around eight. The QR now carries only a server URL and
+   a SHA-256; the kiosk fetches `/config.json` and verifies it. 980 bytes,
+   constant however many apps a deployment has.
+
+   The hash is what keeps this as trustworthy as embedding it. Anyone who
+   scanned the QR can join the hotspot and impersonate the gateway, and a
+   substituted `adminPinHash` would hand over the device — but the hash arrives
+   through the setup wizard, which nothing on the network can reach. Both sides
+   hash the bytes as served; re-encoding on either side breaks every device.
 9. **A `:sample` module exists only to give the end-to-end test a real APK to
    install.** It is not shipped. The test cannot install the kiosk over itself
    mid-run, and a hand-made file would exercise neither the certificate reader
@@ -113,7 +120,7 @@ them by AVD name; `tools/test.sh --serial <avd>` prints one.
 
 | Suite | Where | Count |
 |---|---|---|
-| Policy, lock task, install, PIN, end-to-end | kiosk, `kiosk_aosp_30` | 41 |
+| Policy, lock task, install, PIN, config fetch, end-to-end | kiosk, `kiosk_aosp_30` | 48 |
 | Launcher and PIN UI | kiosk, `kiosk_ui_30` | 12 |
-| Server, library, profiles | provision, any device | 20 |
-| QR payload and golden fixture | provision, JVM | 9 |
+| Server, library, profiles | provision, any device | 21 |
+| QR payload and golden fixture | provision, JVM | 11 |

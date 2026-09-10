@@ -111,6 +111,16 @@ re-add it — `KioskApp` implements `Configuration.Provider` so WorkManager star
 on first use. Anything else added to process startup must be measured the same
 way.
 
+**The QR carries a bootstrap, not the config.** `onProfileProvisioningComplete`
+reads only a server URL and a SHA-256; `ConfigFetch` then downloads
+`/config.json` and refuses it unless the bytes hash to that value. The config
+used to be embedded in the QR, where it grew ~200 bytes per app and stopped
+encoding around eight of them. The hash is load-bearing, not decorative: the QR
+is the only part of the flow with end-to-end integrity, and anyone who scanned
+it can join the hotspot and impersonate the gateway. A substituted
+`adminPinHash` would hand over the device. Hash the bytes **as served** — never
+re-encode either side, or every device rejects genuine configs.
+
 **`Certificates.matches` checks the whole certificate history**, not just the
 current signer, so a package that has rotated its key under APK Signature Scheme
 v3 still verifies against a fingerprint recorded beforehand.

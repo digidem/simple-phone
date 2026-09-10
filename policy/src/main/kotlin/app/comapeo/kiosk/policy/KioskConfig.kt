@@ -35,11 +35,22 @@ data class KioskConfig(
         const val SCHEMA_VERSION = 1
 
         /**
-         * The extras-bundle key carrying this document. The provisioning QR path
-         * delivers every extra as a string, so the whole config travels as one
-         * JSON string rather than as a nested bundle.
+         * Where to fetch this document from. Every extra on the QR path arrives
+         * as a string, so both of these are strings.
          */
-        const val EXTRA_KEY = "app.comapeo.kiosk.CONFIG_JSON"
+        const val EXTRA_SERVER_URL = "app.comapeo.kiosk.SERVER_URL"
+
+        /**
+         * Lowercase hex SHA-256 of the config bytes as served.
+         *
+         * This is what keeps fetching the config over plain HTTP as trustworthy
+         * as carrying it in the QR: the hash itself arrives through the setup
+         * wizard, which nothing on the network can touch.
+         */
+        const val EXTRA_CONFIG_SHA256 = "app.comapeo.kiosk.CONFIG_SHA256"
+
+        /** Path the config is served from, relative to the server URL. */
+        const val CONFIG_PATH = "/config.json"
 
         val json = Json {
             ignoreUnknownKeys = true

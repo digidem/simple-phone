@@ -3,10 +3,13 @@ package app.comapeo.kiosk
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.comapeo.kiosk.policy.KioskConfig
+import app.comapeo.kiosk.policy.ProvisioningBootstrap
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,35 +45,46 @@ class GoldenPayloadTest {
     }
 
     @Test
-    fun theConfigInTheExtrasBundleParses() {
+    fun theBootstrapIsReadableExactlyAsTheReceiverReadsIt() {
         val extras = Json.parseToJsonElement(golden())
             .jsonObject["android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE"]!!
             .jsonObject
 
-        val json = extras[KioskConfig.EXTRA_KEY]!!.jsonPrimitive.content
-        val config = KioskConfig.parse(json)
+        // Built as a PersistableBundle, because that is what the receiver is
+        // handed and getString is what it calls.
+        val bundle = android.os.PersistableBundle().apply {
+            extras.forEach { (key, value) -> putString(key, value.jsonPrimitive.content) }
+        }
 
-        assertEquals("Rio Negro", config.deploymentName)
-        assertEquals(KioskConfig.SCHEMA_VERSION, config.schemaVersion)
-        assertEquals(
-            listOf("com.comapeo", "org.telegram.messenger"),
-            config.packages.map { it.packageName },
-        )
-        assertEquals(listOf("com.comapeo"), config.visibleInLauncher)
-        assertEquals(false, config.showNotificationShade)
-        assertEquals("http://192.168.43.1:8080", config.serverUrl)
+        val bootstrap = ProvisioningBootstrap.from(bundle)
+        assertNotNull("the receiver could not read the bootstrap", bootstrap)
+        assertEquals("http://192.168.43.1:8080", bootstrap!!.serverUrl)
+        assertEquals(64, bootstrap.configSha256.length)
     }
 
     @Test
-    fun everyPackageInThePayloadCarriesAFingerprint() {
-        val extras = Json.parseToJsonElement(golden())
-            .jsonObject["android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE"]!!
-            .jsonObject
-        val config = KioskConfig.parse(extras[KioskConfig.EXTRA_KEY]!!.jsonPrimitive.content)
+    fun theConfigIsNotCarriedInThePayloadAtAll() {
+        // It is fetched over HTTP and checked against the hash above. If it
+        // came back into the QR, the code would grow with every app again.
+        val payload = golden()
+        assertTrue(!payload.contains("adminPinHash"))
+        assertTrue(!payload.contains("visibleInLauncher"))
+    }
 
-        config.packages.forEach {
-            assertEquals("${it.packageName} has a malformed fingerprint", 64, it.certSha256.length)
+    @Test
+    fun aBootstrapMissingEitherHalfIsRefused() {
+        // Half a bootstrap means either an unverifiable config or nowhere to
+        // fetch it from; both have to fail closed rather than provision.
+        val onlyUrl = android.os.PersistableBundle().apply {
+            putString(KioskConfig.EXTRA_SERVER_URL, "http://192.168.43.1:8080")
         }
+        val onlyHash = android.os.PersistableBundle().apply {
+            putString(KioskConfig.EXTRA_CONFIG_SHA256, "a".repeat(64))
+        }
+
+        assertNull(ProvisioningBootstrap.from(onlyUrl))
+        assertNull(ProvisioningBootstrap.from(onlyHash))
+        assertNull(ProvisioningBootstrap.from(null))
     }
 
     @Test

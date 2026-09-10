@@ -10,14 +10,16 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import app.comapeo.kiosk.policy.ConfigFetch
 import app.comapeo.kiosk.policy.DevicePolicy
-import app.comapeo.kiosk.policy.KioskConfig
+import app.comapeo.kiosk.policy.ProvisioningBootstrap
 import app.comapeo.kiosk.policy.Provisioner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Runs the provisioning payload.
@@ -33,10 +35,10 @@ class ProvisioningService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val json = intent?.getStringExtra(EXTRA_CONFIG)
-        val config = json?.let { runCatching { KioskConfig.parse(it) }.getOrNull() }
-        if (config == null) {
-            Log.e(TAG, "Started without a usable config")
+        val serverUrl = intent?.getStringExtra(EXTRA_SERVER_URL)
+        val configSha256 = intent?.getStringExtra(EXTRA_CONFIG_SHA256)
+        if (serverUrl == null || configSha256 == null) {
+            Log.e(TAG, "Started without a usable bootstrap")
             stopSelf(startId)
             return START_NOT_STICKY
         }
@@ -44,14 +46,31 @@ class ProvisioningService : Service() {
         startForeground()
 
         scope.launch {
-            val result = runCatching { Provisioner(applicationContext).provision(config) }
-            result.onSuccess {
-                Log.i(
-                    TAG,
-                    "Provisioning finished: ${it.report.failures.size} failure(s), " +
-                        "report delivered=${it.reportDelivered}",
+            val bootstrap = ProvisioningBootstrap(serverUrl, configSha256)
+            val staged = File(cacheDir, CONFIG_FILE)
+            val config = ConfigFetch.fetch(bootstrap, staged).getOrElse { error ->
+                // The config never arrived or did not match its hash, so there
+                // is nothing to apply and no server URL that can be trusted to
+                // report to. Recorded where the admin screen will show it.
+                Log.e(TAG, "Could not obtain the deployment config", error)
+                Provisioner(applicationContext).recordBootstrapFailure(
+                    error.message ?: "The deployment settings could not be obtained.",
                 )
-            }.onFailure { Log.e(TAG, "Provisioning threw", it) }
+                launchHome()
+                stopSelf(startId)
+                return@launch
+            }
+            staged.delete()
+
+            runCatching { Provisioner(applicationContext).provision(config) }
+                .onSuccess {
+                    Log.i(
+                        TAG,
+                        "Provisioning finished: ${it.report.failures.size} failure(s), " +
+                            "report delivered=${it.reportDelivered}",
+                    )
+                }
+                .onFailure { Log.e(TAG, "Provisioning threw", it) }
 
             launchHome()
             stopSelf(startId)
@@ -103,11 +122,14 @@ class ProvisioningService : Service() {
         private const val TAG = "ProvisioningService"
         private const val CHANNEL = "provisioning"
         private const val NOTIFICATION_ID = 1
-        private const val EXTRA_CONFIG = "config"
+        private const val EXTRA_SERVER_URL = "serverUrl"
+        private const val EXTRA_CONFIG_SHA256 = "configSha256"
+        private const val CONFIG_FILE = "deployment-config.json"
 
-        fun start(context: Context, config: KioskConfig) {
+        fun start(context: Context, bootstrap: ProvisioningBootstrap) {
             val intent = Intent(context, ProvisioningService::class.java)
-                .putExtra(EXTRA_CONFIG, config.encode())
+                .putExtra(EXTRA_SERVER_URL, bootstrap.serverUrl)
+                .putExtra(EXTRA_CONFIG_SHA256, bootstrap.configSha256)
             context.startForegroundService(intent)
         }
     }

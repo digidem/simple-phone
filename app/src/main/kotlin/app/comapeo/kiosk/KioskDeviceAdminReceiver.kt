@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.PersistableBundle
 import android.util.Log
-import app.comapeo.kiosk.policy.KioskConfig
+import app.comapeo.kiosk.policy.ProvisioningBootstrap
 
 /**
  * The provisioning entry point.
@@ -21,15 +21,15 @@ class KioskDeviceAdminReceiver : DeviceAdminReceiver() {
         val extras = intent.getParcelableExtra<PersistableBundle>(
             DevicePolicyManager.EXTRA_PROVISIONING_ADMIN_EXTRAS_BUNDLE,
         )
-        val config = readConfig(extras)
-        if (config == null) {
-            Log.e(TAG, "No usable config in the provisioning extras; nothing applied")
+        val bootstrap = readBootstrap(extras)
+        if (bootstrap == null) {
+            Log.e(TAG, "No usable bootstrap in the provisioning extras; nothing applied")
             return
         }
 
         // A receiver's process may be killed once onReceive returns, so the
         // work is handed to a foreground service rather than a bare coroutine.
-        ProvisioningService.start(context, config)
+        ProvisioningService.start(context, bootstrap)
     }
 
     override fun onEnabled(context: Context, intent: Intent) {
@@ -41,16 +41,15 @@ class KioskDeviceAdminReceiver : DeviceAdminReceiver() {
     }
 
     /**
-     * Values arrive from the QR path as strings only — nested or typed values
-     * through that route are unreliable — so the whole document travels as one
-     * JSON string.
+     * The QR carries only where to fetch the config and what it should hash to,
+     * not the config itself — a deployment's app list made the code too dense
+     * to scan long before it hit the format's limit.
+     *
+     * Values arrive from the QR path as strings only; nested or typed values
+     * through that route are unreliable.
      */
-    private fun readConfig(extras: PersistableBundle?): KioskConfig? {
-        val json = extras?.getString(KioskConfig.EXTRA_KEY) ?: return null
-        return runCatching { KioskConfig.parse(json) }
-            .onFailure { Log.e(TAG, "Provisioning config was not valid JSON", it) }
-            .getOrNull()
-    }
+    private fun readBootstrap(extras: PersistableBundle?): ProvisioningBootstrap? =
+        ProvisioningBootstrap.from(extras)
 
     private companion object {
         const val TAG = "KioskDeviceAdmin"

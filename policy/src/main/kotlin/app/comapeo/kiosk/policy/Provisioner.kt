@@ -121,6 +121,36 @@ class Provisioner(
         reportedAtEpochMs = System.currentTimeMillis(),
     )
 
+    /**
+     * Records a failure that happened before there was any config to apply.
+     *
+     * There is no server URL that can be trusted to report to at this point, so
+     * this only writes locally, where the admin screen shows it. Without it the
+     * device would sit on an empty launcher with no explanation.
+     */
+    fun recordBootstrapFailure(reason: String) {
+        saveLastReport(
+            EnrolmentReport(
+                deviceId = DeviceFacts.deviceId(appContext),
+                deploymentId = "",
+                deploymentName = "",
+                manufacturer = android.os.Build.MANUFACTURER,
+                model = android.os.Build.MODEL,
+                androidVersion = android.os.Build.VERSION.RELEASE,
+                apiLevel = android.os.Build.VERSION.SDK_INT,
+                kioskVersion = kioskVersion(),
+                buildVariant = buildVariant(),
+                isDeviceOwner = policy.isDeviceOwner,
+                installed = emptyList(),
+                policiesApplied = emptyList(),
+                failures = listOf(reason),
+                permissionFailures = emptyList(),
+                hostileOem = DeviceFacts.hostileOem(),
+                reportedAtEpochMs = System.currentTimeMillis(),
+            ),
+        )
+    }
+
     fun lastReport(): EnrolmentReport? {
         val file = File(appContext.filesDir, LAST_REPORT)
         if (!file.exists()) return null
