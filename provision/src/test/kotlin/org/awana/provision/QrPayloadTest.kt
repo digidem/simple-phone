@@ -70,8 +70,9 @@ class QrPayloadTest {
 
     /**
      * Regenerate after an intended payload change with:
-     * `./gradlew :app:testDebugUnitTest -Dgolden=write`, then copy the file into
-     * the kiosk repository too.
+     * `./gradlew :provision:testDebugUnitTest -Dgolden=write`. The kiosk's
+     * `GoldenPayloadTest` reads the same file out of `testdata/`, so an
+     * unintended change fails there instead.
      */
     @Test
     fun matchesTheGoldenFixture() {

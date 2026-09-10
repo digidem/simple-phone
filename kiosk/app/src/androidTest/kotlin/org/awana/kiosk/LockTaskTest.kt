@@ -1,18 +1,15 @@
 package org.awana.kiosk
 
 import android.app.ActivityManager
-import android.app.admin.DevicePolicyManager
 import android.content.Context
-import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
-import org.awana.kiosk.launcher.TAG_LAUNCHER_ROOT
 import org.awana.kiosk.policy.DevicePolicy
+import org.awana.kiosk.policy.LockTaskBreakService
 import org.awana.kiosk.policy.Provisioner
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -55,13 +52,9 @@ class LockTaskTest {
 
     @After
     fun tearDown() {
-        // Emptying the allowlist is what reliably ends lock task; calling
-        // stopLockTask needs a handle on the activity, which is exactly what
-        // this test avoids relying on.
-        val dpm = context.getSystemService(DevicePolicyManager::class.java)
-        dpm.setLockTaskPackages(policy.admin, emptyArray())
+        LockTaskHarness.leave(context)
         device.executeShellCommand("cmd statusbar collapse")
-        device.waitForIdle(SETTLE_MS)
+        device.waitForIdle(LockTaskHarness.SETTLE_MS)
     }
 
     @Test
@@ -79,7 +72,7 @@ class LockTaskTest {
         enterLockTask()
 
         device.openNotification()
-        device.waitForIdle(SETTLE_MS)
+        device.waitForIdle(LockTaskHarness.SETTLE_MS)
 
         assertFalse(
             "quick settings opened in lock task; the shade is the whole point of this project",
@@ -109,7 +102,7 @@ class LockTaskTest {
 
         repeat(3) {
             device.pressBack()
-            device.waitForIdle(SETTLE_MS)
+            device.waitForIdle(LockTaskHarness.SETTLE_MS)
         }
 
         assertLocked("back left the launcher")
@@ -120,7 +113,7 @@ class LockTaskTest {
         enterLockTask()
 
         device.pressRecentApps()
-        device.waitForIdle(SETTLE_MS)
+        device.waitForIdle(LockTaskHarness.SETTLE_MS)
 
         // OVERVIEW is deliberately not among the lock task features.
         assertLocked("recents opened, which would be an escape route")
@@ -135,58 +128,46 @@ class LockTaskTest {
         enterLockTask()
 
         device.pressHome()
-        device.waitForIdle(SETTLE_MS)
+        device.waitForIdle(LockTaskHarness.SETTLE_MS)
 
         assertLocked("home left lock task")
     }
 
+    @Test
+    fun aTimedBreakLocksTheDeviceAgainWhenItExpires() {
+        enterLockTask()
+        LockTaskHarness.leave(context)
+        assertEquals(
+            "the break has to start from an unlocked device or this proves nothing",
+            ActivityManager.LOCK_TASK_MODE_NONE,
+            LockTaskHarness.lockTaskModeState(context),
+        )
+
+        LockTaskBreakService.start(context, BREAK_MS)
+
+        LockTaskHarness.awaitLocked(
+            context,
+            device,
+            "the timed break expired without putting the device back into lock task, " +
+                "which would leave a phone unlocked in the field",
+        )
+    }
+
     private fun assertLocked(what: String) {
-        val activityManager = context.getSystemService(ActivityManager::class.java)
-        assertEquals(what, ActivityManager.LOCK_TASK_MODE_LOCKED, activityManager.lockTaskModeState)
+        assertEquals(
+            what,
+            ActivityManager.LOCK_TASK_MODE_LOCKED,
+            LockTaskHarness.lockTaskModeState(context),
+        )
     }
 
     private fun enterLockTask() {
-        // A freshly created emulator turns its screen off between runs; an
-        // activity started behind a dark screen is stopped at once and never
-        // gets a focused window, so every injected key would ANR the app.
-        device.wakeUp()
         runBlocking { Provisioner(context).provision(TestConfigs.policyOnly()) }
-        val home = DevicePolicy.launcherComponent(context)!!
-        context.startActivity(
-            Intent(Intent.ACTION_MAIN)
-                .addCategory(Intent.CATEGORY_HOME)
-                .setComponent(home)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-        // Waiting for the package is not enough: on a software-rendered
-        // emulator the first Compose frame can take several seconds, and until
-        // it lands the window has no focus, so injected keys ANR the app.
-        val drawn = device.wait(
-            Until.hasObject(By.res(context.packageName, TAG_LAUNCHER_ROOT)),
-            LAUNCH_TIMEOUT_MS,
-        )
-        assertTrue("the launcher never drew its first frame", drawn != null)
-
-        // Re-entering lock task after a previous test left it re-creates the
-        // activity, and the old instance's frame satisfies the wait above. So
-        // also wait for the lock to be active and the new window to hold
-        // focus; a key injected before that is dropped and ANRs the app.
-        val deadline = System.currentTimeMillis() + LAUNCH_TIMEOUT_MS
-        val activityManager = context.getSystemService(ActivityManager::class.java)
-        while (System.currentTimeMillis() < deadline) {
-            val locked = activityManager.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_LOCKED
-            val focused = device.executeShellCommand("dumpsys window")
-                .lineSequence()
-                .any { it.contains("mCurrentFocus") && it.contains(context.packageName) }
-            if (locked && focused) break
-            Thread.sleep(500)
-        }
-        device.waitForIdle(SETTLE_MS)
+        LockTaskHarness.startLauncher(context, device)
     }
 
     private companion object {
         const val SYSTEM_UI = "com.android.systemui"
-        const val LAUNCH_TIMEOUT_MS = 40_000L
-        const val SETTLE_MS = 2_000L
+        const val BREAK_MS = 2_000L
     }
 }
