@@ -24,11 +24,67 @@ data class SessionState(
     val serverUrl: String? = null,
     val qrPayload: String? = null,
     val reports: List<EnrolmentReport> = emptyList(),
+    /** Phones that have asked the server for something but have not reported yet. */
+    val downloading: List<Downloading> = emptyList(),
     val error: String? = null,
 ) {
     val enrolled: Int get() = reports.size
     val succeeded: Int get() = reports.count { it.succeeded }
+    val failed: Int get() = reports.count { !it.succeeded }
+
+    /** In flight means still asking for files. A phone that went quiet is not. */
+    fun inFlight(now: Long): List<Downloading> = downloading.filter { !it.isSilent(now) }
+
+    /**
+     * Everything the session knows about, newest activity first. A phone has no
+     * identity until it reports, so the two halves cannot be merged earlier
+     * than this.
+     */
+    fun phones(now: Long): List<Phone> =
+        downloading.sortedByDescending { it.lastSeenEpochMs }.map {
+            if (it.isSilent(now)) Phone.Silent(it, now - it.lastSeenEpochMs) else Phone.Copying(it)
+        } + reports.sortedByDescending { it.reportedAtEpochMs }.map { Phone.Reported(it) }
+
+    fun status(now: Long): SessionStatus = when {
+        // A problem outranks a count: it is the only thing here that needs
+        // acting on.
+        failed > 0 -> SessionStatus.Problem
+        inFlight(now).isNotEmpty() -> SessionStatus.InProgress
+        enrolled > 0 -> SessionStatus.Complete
+        else -> SessionStatus.Idle
+    }
 }
+
+/**
+ * A phone mid-download. All the server has is an address and a sequence of
+ * requests, which is why this carries no name.
+ */
+data class Downloading(
+    val address: String,
+    /** The app being fetched, or null while the kiosk and the config are. */
+    val step: String? = null,
+    val percent: Int = 0,
+    val lastSeenEpochMs: Long = 0,
+) {
+    fun isSilent(now: Long): Boolean = now - lastSeenEpochMs > SILENT_AFTER_MS
+
+    companion object {
+        /**
+         * Long enough to cover a large APK arriving over a hotspot without a
+         * single further request: "stopped responding" is inferred from
+         * silence, and nothing on the device reports it.
+         */
+        const val SILENT_AFTER_MS = 3 * 60_000L
+    }
+}
+
+sealed interface Phone {
+    data class Copying(val device: Downloading) : Phone
+    data class Silent(val device: Downloading, val silentForMs: Long) : Phone
+    data class Reported(val report: EnrolmentReport) : Phone
+}
+
+enum class SessionStatus { Idle, InProgress, Complete, Problem }
 
 /**
  * Holds one enrolment session: hotspot up, server up, QR shown, reports coming
@@ -99,7 +155,7 @@ class ProvisioningSession(context: Context) {
             adminPinHash = profile.adminPinHash,
             serverUrl = serverUrl,
             packages = specs,
-            visibleInLauncher = profile.visibleInLauncher,
+            launcher = profile.launcher.filter { it.packageName in profile.packages },
             wifiNetworks = profile.wifiNetworks,
             showNotificationShade = profile.showNotificationShade,
             locale = profile.locale,
@@ -111,6 +167,13 @@ class ProvisioningSession(context: Context) {
         val configJson = KioskJson.compact.encodeToString(KioskConfig.serializer(), config)
         val configSha256 = Digests.sha256Hex(configJson.toByteArray())
 
+        // What a device fetches, in the order it fetches it: the only progress
+        // signal there is, since nothing reports until the very end.
+        val steps = listOf(DPC_PATH, KioskConfig.CONFIG_PATH) + specs.map { it.path }
+        val labels = specs.associate { spec ->
+            spec.path to (library.find(spec.packageName)?.label ?: spec.packageName)
+        }
+
         val manifest = ServerManifest(profile.id, profile.name, specs)
         val running = ProvisioningServer(
             port = PORT,
@@ -118,7 +181,16 @@ class ProvisioningSession(context: Context) {
             payload = served,
             manifest = manifest,
             configJson = configJson,
-            onReport = { report -> _state.update { it.copy(reports = it.reports.replacing(report)) } },
+            onReport = { address, report ->
+                _state.update {
+                    it.copy(
+                        reports = it.reports.replacing(report),
+                        // It has a name now, so its anonymous half is spent.
+                        downloading = it.downloading.filterNot { d -> d.address == address },
+                    )
+                }
+            },
+            onRequest = { address, uri -> noteRequest(address, uri, steps, labels) },
         )
         runCatching { running.start(SOCKET_TIMEOUT_MS, false) }.getOrElse { error ->
             hotspot.stop()
@@ -157,6 +229,31 @@ class ProvisioningSession(context: Context) {
         _state.value = SessionState()
     }
 
+    private fun noteRequest(
+        address: String,
+        uri: String,
+        steps: List<String>,
+        labels: Map<String, String>,
+    ) {
+        if (uri == REPORT_PATH) return
+        val at = steps.indexOf(uri)
+        if (at < 0) return
+        // Asking for step n means the n before it arrived. 100% is a report,
+        // never a request.
+        val percent = at * 100 / steps.size
+        _state.update { state ->
+            val existing = state.downloading.firstOrNull { it.address == address }
+            val updated = (existing ?: Downloading(address)).copy(
+                step = labels[uri],
+                percent = maxOf(existing?.percent ?: 0, percent),
+                lastSeenEpochMs = System.currentTimeMillis(),
+            )
+            state.copy(
+                downloading = state.downloading.filterNot { it.address == address } + updated,
+            )
+        }
+    }
+
     private fun failed(profile: DeploymentProfile, message: String?) =
         SessionState(profileId = profile.id, profileName = profile.name, error = message)
 
@@ -179,6 +276,8 @@ class ProvisioningSession(context: Context) {
         const val PORT = 8080
         const val SOCKET_TIMEOUT_MS = 60_000
         const val KIOSK_APK = "kiosk.apk"
+        const val DPC_PATH = "/dpc.apk"
+        const val REPORT_PATH = "/report"
     }
 }
 

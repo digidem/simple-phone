@@ -32,13 +32,19 @@ class ProvisioningServer(
      * re-encoding the config here would break the check on every device.
      */
     private val configJson: String,
-    private val onReport: (EnrolmentReport) -> Unit,
+    private val onReport: (address: String, report: EnrolmentReport) -> Unit,
+    /**
+     * Every request, with the address it came from. Until a device reports it
+     * has no identity at all, so its requests are the only sign it exists.
+     */
+    private val onRequest: (address: String, uri: String) -> Unit = { _, _ -> },
 ) : NanoHTTPD(port) {
 
     data class ServedApk(val packageName: String, val file: File)
 
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri.orEmpty()
+        onRequest(session.remoteIpAddress.orEmpty(), uri)
         return try {
             when {
                 session.method == Method.POST && uri == "/report" -> handleReport(session)
@@ -74,7 +80,7 @@ class ProvisioningServer(
         session.parseBody(body)
         val text = body["postData"].orEmpty()
         return try {
-            onReport(EnrolmentReport.parse(text))
+            onReport(session.remoteIpAddress.orEmpty(), EnrolmentReport.parse(text))
             text(Response.Status.OK, "ok")
         } catch (e: Exception) {
             Log.w(TAG, "Unreadable report: $text", e)

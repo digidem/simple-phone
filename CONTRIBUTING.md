@@ -21,11 +21,12 @@ shared/           The wire protocol both apps compile: KioskConfig, PackageSpec,
                   WifiNetwork, EnrolmentReport, AdminPin, Certificates, DeviceLabel.
 kiosk/policy/     DevicePolicyManager wrapper, config fetch, installer, provisioning.
                   No UI dependencies.
-kiosk/launcher/   The HOME activity, icon grid, PIN entry, admin screen.
+design/           The generated colour scheme both apps paint themselves with.
+kiosk/launcher/   The HOME activity, hero and grid, PIN entry, admin screens.
 kiosk/app/        Assembly: the DeviceAdminReceiver, the boot receiver, the
                   provisioning service.
 provision/        The trainer's app: APK library, deployment profiles, hotspot,
-                  HTTP server, QR, dashboard.
+                  HTTP server, QR, session status and phone list.
 sample/           Not shipped. A real APK for the end-to-end test to install.
 tools/            test.sh and dev-keys.sh.
 testdata/         The golden provisioning QR fixture.
@@ -313,9 +314,42 @@ and a wallpaper picker are each either dead weight or an escape route. It loads
 its app list off the main thread and rasterises icons once, rather than doing
 disk and `PackageManager` work during composition.
 
+**The launcher's recovery buttons have no PIN gate.** "Set this phone up again"
+and "Remove the lock" appear only when there is no config — and with no config
+there is no `adminPinHash`, so `PinEntryScreen` could never open. Without them
+such a phone needs ADB or a factory reset. There is also nothing on it yet to
+protect, and it is still in the deployer's hands.
+
+**A failed provisioning attempt keeps its bootstrap.** The server URL and config
+hash arrive once, through the setup wizard, so `Provisioner.recordBootstrapFailure`
+writes them beside the failure report and `ProvisioningService` started with no
+extras re-runs `ConfigFetch` against them. That is what "set this phone up
+again" does, and it covers the common case of a hotspot that came back.
+
+**At most one app can be the hero**, and `KioskConfig.parse` refuses a document
+naming two. Zero heroes is legal — the launcher then shows only the grid. The
+provision app's entry editor upholds it by demoting whichever app held the role.
+
+**A schemaVersion 2 config is migrated at parse.** A phone in the field has
+`visibleInLauncher` on disk; without the migration in `KioskConfig.parse` an app
+update would come up with a blank launcher on a working phone. The field is kept
+as a deprecated read-only property and cleared on the way through.
+
+**The PIN is a stock text field, not a keypad.** A bespoke twelve-key pad is a
+custom component with its own layout, state and disabled handling, and the
+system keyboard is available in lock task anyway. `PasswordVisualTransformation`
+runs before semantics, so not even the accessibility tree carries the digits.
+
 **The PIN rate limiter uses elapsed realtime, not the wall clock.** The kiosk
 sets `setAutoTimeEnabled`, so the wall clock can jump backwards on first sync
 and would otherwise hand an attacker a free reset.
+
+**Neither app names a colour outside `design/`.** Both schemes are generated
+from one indigo seed with the Material tonal-spot algorithm, so every role is a
+tone of a palette rather than a value someone picked. The kiosk pins itself to
+light: every phone in a deployment has to look the same for a trainer to support
+one over the phone. The white behind the QR is the single exception — a camera
+needs a light quiet zone in dark mode as much as light.
 
 **Dependencies, and why each is there:** NanoHTTPD for the provisioning server,
 ZXing `core` alone for QR encoding, kotlinx-serialization for the wire format,

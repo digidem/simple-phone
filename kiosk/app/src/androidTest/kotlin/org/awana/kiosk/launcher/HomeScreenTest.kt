@@ -1,7 +1,9 @@
 package org.awana.kiosk.launcher
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -11,6 +13,7 @@ import androidx.compose.ui.test.up
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.awana.kiosk.policy.DevicePolicy
+import org.awana.kiosk.shared.LauncherRole
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.BeforeClass
@@ -46,34 +49,75 @@ class HomeScreenTest {
         }
     }
 
-    private fun app(packageName: String, label: String) =
-        LaunchableApp(packageName, label, ImageBitmap(1, 1))
+    private fun app(
+        packageName: String,
+        label: String,
+        role: LauncherRole = LauncherRole.SMALL,
+        subtitle: String? = null,
+    ) = LaunchableApp(packageName, role, label, subtitle, ImageBitmap(1, 1))
+
+    private fun apps(vararg app: LaunchableApp) = HomeState.Apps(
+        hero = app.firstOrNull { it.role == LauncherRole.HERO },
+        small = app.filter { it.role == LauncherRole.SMALL },
+    )
+
+    @Composable
+    private fun Home(
+        state: HomeState,
+        onLaunch: (String) -> Unit = {},
+        onSetUpAgain: () -> Unit = {},
+        onRemoveLock: () -> Unit = {},
+        onAdminGesture: () -> Unit = {},
+    ) = HomeScreen(state, onLaunch, onSetUpAgain, onRemoveLock, onAdminGesture)
 
     @Test
-    fun showsAnIconForEveryVisibleApp() {
+    fun showsTheHeroAndEverySmallApp() {
         compose.setContent {
             KioskTheme {
-                HomeScreen(
-                    apps = listOf(app("com.comapeo", "CoMapeo"), app("org.telegram.messenger", "Telegram")),
-                    onLaunch = {},
-                    onAdminGesture = {},
+                Home(
+                    apps(
+                        app("com.comapeo", "CoMapeo", LauncherRole.HERO, "Maps and recordings"),
+                        app("org.telegram.messenger", "Telegram"),
+                        app("org.osmand", "Offline maps"),
+                    ),
                 )
             }
         }
 
         compose.onNodeWithTag(tagFor("com.comapeo")).assertIsDisplayed()
         compose.onNodeWithTag(tagFor("org.telegram.messenger")).assertIsDisplayed()
+        compose.onNodeWithTag(tagFor("org.osmand")).assertIsDisplayed()
+        compose.onNodeWithText("Maps and recordings").assertIsDisplayed()
     }
 
     @Test
-    fun tappingAnIconLaunchesThatApp() {
+    fun theSubtitleIsTheHerosAlone() {
+        compose.setContent {
+            KioskTheme {
+                Home(apps(app("org.telegram.messenger", "Telegram", subtitle = "Messages")))
+            }
+        }
+
+        compose.onNodeWithText("Messages").assertDoesNotExist()
+    }
+
+    @Test
+    fun aDeploymentWithNoHeroShowsJustTheGrid() {
+        compose.setContent {
+            KioskTheme { Home(apps(app("org.telegram.messenger", "Telegram"))) }
+        }
+
+        compose.onNodeWithTag(tagFor("org.telegram.messenger")).assertIsDisplayed()
+    }
+
+    @Test
+    fun tappingAnAppLaunchesIt() {
         var launched: String? = null
         compose.setContent {
             KioskTheme {
-                HomeScreen(
-                    apps = listOf(app("com.comapeo", "CoMapeo")),
+                Home(
+                    apps(app("com.comapeo", "CoMapeo", LauncherRole.HERO)),
                     onLaunch = { launched = it },
-                    onAdminGesture = {},
                 )
             }
         }
@@ -84,12 +128,58 @@ class HomeScreenTest {
     }
 
     @Test
-    fun anEmptyDeploymentSaysSoRatherThanShowingABlankScreen() {
+    fun aPhoneThatWasNeverSetUpSaysSoAndOffersNoRetry() {
         compose.setContent {
-            KioskTheme { HomeScreen(apps = emptyList(), onLaunch = {}, onAdminGesture = {}) }
+            KioskTheme { Home(HomeState.NotSetUp(canSetUpAgain = false)) }
         }
 
-        compose.onNodeWithTag(TAG_EMPTY).assertIsDisplayed()
+        compose.onNodeWithTag(TAG_NOT_SET_UP).assertIsDisplayed()
+        // Nothing was ever scanned, so there is no bootstrap to re-run.
+        compose.onNodeWithTag(TAG_SET_UP_AGAIN).assertDoesNotExist()
+        compose.onNodeWithTag(TAG_REMOVE_LOCK).assertIsDisplayed()
+    }
+
+    @Test
+    fun aSetupThatBrokeIsADifferentScreenFromOneThatNeverStarted() {
+        compose.setContent {
+            KioskTheme { Home(HomeState.SetupUnfinished(canSetUpAgain = true)) }
+        }
+
+        compose.onNodeWithTag(TAG_SETUP_UNFINISHED).assertIsDisplayed()
+        compose.onNodeWithTag(TAG_NOT_SET_UP).assertDoesNotExist()
+    }
+
+    @Test
+    fun bothRecoveryActionsRunWithoutAPin() {
+        var setUpAgain = false
+        var removeLock = false
+        compose.setContent {
+            KioskTheme {
+                Home(
+                    HomeState.SetupUnfinished(canSetUpAgain = true),
+                    onSetUpAgain = { setUpAgain = true },
+                    onRemoveLock = { removeLock = true },
+                )
+            }
+        }
+
+        compose.onNodeWithTag(TAG_SET_UP_AGAIN).performClick()
+        compose.onNodeWithTag(TAG_REMOVE_LOCK).performClick()
+
+        assertEquals(true, setUpAgain)
+        assertEquals(true, removeLock)
+    }
+
+    @Test
+    fun aProvisionedPhoneWithNothingVisibleGetsNoRecoveryButtons() {
+        compose.setContent {
+            KioskTheme { Home(HomeState.NoApps) }
+        }
+
+        compose.onNodeWithTag(TAG_NO_APPS).assertIsDisplayed()
+        // The PIN works on this phone, so admin is the way in — not a way out.
+        compose.onNodeWithTag(TAG_SET_UP_AGAIN).assertDoesNotExist()
+        compose.onNodeWithTag(TAG_REMOVE_LOCK).assertDoesNotExist()
     }
 
     @Test
@@ -97,7 +187,7 @@ class HomeScreenTest {
         var triggered = false
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            KioskTheme { HomeScreen(apps = emptyList(), onLaunch = {}, onAdminGesture = { triggered = true }) }
+            KioskTheme { Home(HomeState.NoApps, onAdminGesture = { triggered = true }) }
         }
 
         compose.onNodeWithTag(TAG_ADMIN_CORNER).performTouchInput { down(center) }
@@ -113,7 +203,7 @@ class HomeScreenTest {
         var triggered = false
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            KioskTheme { HomeScreen(apps = emptyList(), onLaunch = {}, onAdminGesture = { triggered = true }) }
+            KioskTheme { Home(HomeState.NoApps, onAdminGesture = { triggered = true }) }
         }
 
         compose.onNodeWithTag(TAG_ADMIN_CORNER).performTouchInput { down(center) }
@@ -125,7 +215,7 @@ class HomeScreenTest {
     @Test
     fun theAdminCornerHasNoVisibleAffordance() {
         compose.setContent {
-            KioskTheme { HomeScreen(apps = emptyList(), onLaunch = {}, onAdminGesture = {}) }
+            KioskTheme { Home(HomeState.NoApps) }
         }
 
         // No label and no content description: a user who cannot read must not

@@ -2,10 +2,15 @@ package org.awana.provision
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +23,7 @@ import androidx.compose.ui.unit.dp
  * The walkthrough, written for a partner trainer rather than an engineer. The
  * six-tap step is the one people get wrong, so it gets its own line.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HelpScreen(modifier: Modifier = Modifier) {
     val steps = listOf(
@@ -29,9 +35,16 @@ fun HelpScreen(modifier: Modifier = Modifier) {
         R.string.help_step6,
     )
 
+    Scaffold(
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.help_title)) }) },
+        contentWindowInsets = WindowInsets(0),
+        modifier = modifier.fillMaxSize(),
+    ) { padding ->
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = modifier
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
             .testTag(TAG_HELP),
@@ -62,6 +75,7 @@ fun HelpScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(top = 8.dp),
         )
     }
+}
 }
 
 const val TAG_HELP = "help-screen"

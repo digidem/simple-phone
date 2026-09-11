@@ -39,6 +39,25 @@ data class ApkEntry(
 }
 
 /**
+ * An APK read but not yet in the library, so the caller can see what committing
+ * it would do.
+ */
+data class StagedApk(
+    val entry: ApkEntry,
+    /** What the library holds for this package now, if anything. */
+    val replaces: ApkEntry?,
+    internal val file: File,
+) {
+    /**
+     * Every phone already set up records the fingerprint the deployment was
+     * made with and refuses anything else, so a new key means those phones
+     * cannot take this update at all.
+     */
+    val keyChanged: Boolean
+        get() = replaces != null && replaces.certSha256 != entry.certSha256
+}
+
+/**
  * The trainer-populated APK library.
  *
  * Awana does not redistribute third-party APKs — that removes a trademark and
@@ -68,27 +87,44 @@ class ApkLibrary(context: Context) {
      * Returns a failure with a trainer-readable message rather than throwing:
      * picking the wrong file is a normal thing to do, not an error condition.
      */
-    suspend fun add(uri: Uri): Result<ApkEntry> = withContext(Dispatchers.IO) {
+    suspend fun add(uri: Uri): Result<ApkEntry> = stage(uri).map { commit(it) }
+
+    /**
+     * Reads an APK without committing it, so the caller can see what it would
+     * replace first. A version signed with a different key is refused by every
+     * phone already set up, and that has to be said before the file lands.
+     *
+     * The staged file stays on disk until [commit] or [discard].
+     */
+    suspend fun stage(uri: Uri): Result<StagedApk> = withContext(Dispatchers.IO) {
         val staged = File(dir, "staging-${System.currentTimeMillis()}.apk")
         try {
             val copied = appContext.contentResolver.openInputStream(uri)?.use { input ->
                 staged.outputStream().use { input.copyTo(it) }
             }
             if (copied == null) {
+                staged.delete()
                 return@withContext Result.failure(ApkImportError("That file could not be opened."))
             }
 
             val info = appContext.packageManager.getPackageArchiveInfo(
                 staged.absolutePath,
                 PackageManager.GET_PERMISSIONS,
-            ) ?: return@withContext Result.failure(
-                ApkImportError("That file is not an Android app (APK)."),
             )
+            if (info == null) {
+                staged.delete()
+                return@withContext Result.failure(
+                    ApkImportError("That file is not an Android app (APK)."),
+                )
+            }
 
             val fingerprint = Certificates.ofApkFile(appContext, staged).firstOrNull()
-                ?: return@withContext Result.failure(
+            if (fingerprint == null) {
+                staged.delete()
+                return@withContext Result.failure(
                     ApkImportError("That APK is not signed, so it cannot be deployed."),
                 )
+            }
 
             val appInfo = info.applicationInfo?.apply {
                 // getPackageArchiveInfo leaves these unset, and the label cannot
@@ -100,35 +136,51 @@ class ApkLibrary(context: Context) {
                 ?.let { appContext.packageManager.getApplicationLabel(it).toString() }
                 ?: info.packageName
 
-            val fileName = "${info.packageName}.apk"
-            val target = File(dir, fileName)
-            staged.copyTo(target, overwrite = true)
-
-            val entry = ApkEntry(
-                packageName = info.packageName,
-                label = label,
-                versionName = info.versionName,
-                versionCode = info.longVersionCode,
-                certSha256 = fingerprint,
-                fileName = fileName,
-                sizeBytes = target.length(),
-                addedAtEpochMs = System.currentTimeMillis(),
-                permissions = runtimePermissions(info.requestedPermissions.orEmpty().toList()),
+            Result.success(
+                StagedApk(
+                    entry = ApkEntry(
+                        packageName = info.packageName,
+                        label = label,
+                        versionName = info.versionName,
+                        versionCode = info.longVersionCode,
+                        certSha256 = fingerprint,
+                        fileName = "${info.packageName}.apk",
+                        sizeBytes = staged.length(),
+                        addedAtEpochMs = System.currentTimeMillis(),
+                        permissions = runtimePermissions(info.requestedPermissions.orEmpty().toList()),
+                    ),
+                    replaces = find(info.packageName),
+                    file = staged,
+                ),
             )
-            save(entries().filterNot { it.packageName == entry.packageName } + entry)
-            Result.success(entry)
         } catch (e: Exception) {
+            staged.delete()
             Log.e(TAG, "Import failed", e)
             Result.failure(ApkImportError("That file could not be read: ${e.message}"))
-        } finally {
-            staged.delete()
         }
+    }
+
+    /** Replacing is updating: [ApkLibrary.add] has always replaced in place. */
+    fun commit(staged: StagedApk): ApkEntry {
+        val target = File(dir, staged.entry.fileName)
+        staged.file.copyTo(target, overwrite = true)
+        staged.file.delete()
+        val entry = staged.entry.copy(sizeBytes = target.length())
+        save(entries().filterNot { it.packageName == entry.packageName } + entry)
+        return entry
+    }
+
+    fun discard(staged: StagedApk) {
+        staged.file.delete()
     }
 
     fun remove(packageName: String) {
         entries().firstOrNull { it.packageName == packageName }?.let { File(dir, it.fileName).delete() }
         save(entries().filterNot { it.packageName == packageName })
     }
+
+    /** Lets a test stand in a library entry recorded with a different key. */
+    internal fun replaceIndexForTest(entries: List<ApkEntry>) = save(entries)
 
     private fun save(entries: List<ApkEntry>) {
         index.writeText(Json.encodeList(entries.sortedBy { it.label }))

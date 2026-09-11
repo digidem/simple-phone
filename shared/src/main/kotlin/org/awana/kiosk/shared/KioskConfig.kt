@@ -21,8 +21,15 @@ data class KioskConfig(
     val serverUrl: String? = null,
     /** Installed, uninstall-blocked and lock-task allowlisted. */
     val packages: List<PackageSpec> = emptyList(),
-    /** Shown as an icon on the launcher. A subset of [packages]. */
-    val visibleInLauncher: List<String> = emptyList(),
+    /** How each app appears on the launcher. Apps absent from this list are installed only. */
+    val launcher: List<LauncherEntry> = emptyList(),
+    /**
+     * schemaVersion 2's launcher list. [parse] turns it into [launcher] and
+     * clears it, so a device that updates with a v2 config on disk does not
+     * come up with a blank launcher.
+     */
+    @Deprecated("schemaVersion 2. Read by parse() only.", ReplaceWith("launcher"))
+    val visibleInLauncher: List<String>? = null,
     /**
      * Networks every device joins at provisioning. Users cannot configure Wi-Fi
      * themselves, so this is how a team reaches its sync network without the
@@ -33,13 +40,20 @@ data class KioskConfig(
     val locale: String = "en",
     val screenOffTimeoutMs: Long = 120_000,
 ) {
-    val launcherPackages: List<String>
-        get() = packages.map { it.packageName }.filter { it in visibleInLauncher }
+    /** Entries whose package this config also installs, in launcher order. */
+    val launcherEntries: List<LauncherEntry>
+        get() = launcher.filter { entry -> packages.any { it.packageName == entry.packageName } }
+
+    val hero: LauncherEntry?
+        get() = launcherEntries.firstOrNull { it.role == LauncherRole.HERO }
+
+    val smallEntries: List<LauncherEntry>
+        get() = launcherEntries.filter { it.role == LauncherRole.SMALL }
 
     fun encode(): String = KioskJson.pretty.encodeToString(serializer(), this)
 
     companion object {
-        const val SCHEMA_VERSION = 2
+        const val SCHEMA_VERSION = 3
 
         /**
          * The two admin extras the QR carries. Every extra on the QR path
@@ -57,8 +71,72 @@ data class KioskConfig(
         /** Path the config is served from, relative to the server URL. */
         const val CONFIG_PATH = "/config.json"
 
-        fun parse(text: String): KioskConfig = KioskJson.pretty.decodeFromString(serializer(), text)
+        fun parse(text: String): KioskConfig =
+            KioskJson.pretty.decodeFromString(serializer(), text)
+                .migrated()
+                .also { it.checkOneHero() }
     }
+}
+
+@Suppress("DEPRECATION")
+private fun KioskConfig.migrated(): KioskConfig {
+    val legacy = visibleInLauncher.orEmpty()
+    if (launcher.isNotEmpty() || legacy.isEmpty()) {
+        return if (visibleInLauncher == null) this else copy(visibleInLauncher = null)
+    }
+    // v2 took launcher order from `packages`, so the phone keeps showing the
+    // same apps in the same order; the first becomes the hero.
+    val visible = packages.map { it.packageName }.filter { it in legacy }
+    return copy(
+        schemaVersion = KioskConfig.SCHEMA_VERSION,
+        launcher = visible.mapIndexed { index, packageName ->
+            LauncherEntry(
+                packageName = packageName,
+                role = if (index == 0) LauncherRole.HERO else LauncherRole.SMALL,
+            )
+        },
+        visibleInLauncher = null,
+    )
+}
+
+private fun KioskConfig.checkOneHero() {
+    val heroes = launcher.filter { it.role == LauncherRole.HERO }
+    require(heroes.size <= 1) {
+        "A deployment can have at most one hero app, this one names " +
+            heroes.joinToString(", ") { it.packageName }
+    }
+}
+
+/** How one app appears on the launcher. */
+@Serializable
+data class LauncherEntry(
+    val packageName: String,
+    val role: LauncherRole = LauncherRole.SMALL,
+    /** null uses the app's own label from PackageManager. */
+    val label: String? = null,
+    /** One short line under the name. Only shown for [LauncherRole.HERO]. */
+    val subtitle: String? = null,
+    /** Base64 PNG, or null for the app's own icon. Keep under ~40 KB — it rides in the config. */
+    val iconPng: String? = null,
+)
+
+@Serializable
+enum class LauncherRole { HERO, SMALL, HIDDEN }
+
+/**
+ * Replaces the entry for the same package, or appends it, upholding the
+ * one-hero invariant: promoting an app demotes whichever app held the role.
+ */
+fun List<LauncherEntry>.withEntry(entry: LauncherEntry): List<LauncherEntry> {
+    val others = filterNot { it.packageName == entry.packageName }
+    val demoted =
+        if (entry.role == LauncherRole.HERO) {
+            others.map { if (it.role == LauncherRole.HERO) it.copy(role = LauncherRole.SMALL) else it }
+        } else {
+            others
+        }
+    val at = indexOfFirst { it.packageName == entry.packageName }
+    return if (at < 0) demoted + entry else demoted.toMutableList().apply { add(at, entry) }
 }
 
 /** A package to install, with the signing certificate it must present. */
@@ -94,6 +172,7 @@ object KioskJson {
     val pretty = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
+        explicitNulls = false
         prettyPrint = true
     }
 
@@ -105,6 +184,7 @@ object KioskJson {
     val compact = Json {
         ignoreUnknownKeys = true
         encodeDefaults = false
+        explicitNulls = false
         prettyPrint = false
     }
 }

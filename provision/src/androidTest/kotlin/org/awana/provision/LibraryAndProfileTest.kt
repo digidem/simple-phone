@@ -16,6 +16,8 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import org.awana.kiosk.shared.LauncherEntry
+import org.awana.kiosk.shared.LauncherRole
 
 @RunWith(AndroidJUnit4::class)
 class LibraryAndProfileTest {
@@ -100,6 +102,49 @@ class LibraryAndProfileTest {
     }
 
     @Test
+    fun stagingSaysWhatItWouldReplaceWithoutReplacingIt() = runBlocking {
+        val library = ApkLibrary(context)
+        val ownApk = File(context.applicationInfo.sourceDir).toUri()
+        val first = library.add(ownApk).getOrThrow()
+
+        val staged = library.stage(ownApk).getOrThrow()
+
+        assertEquals(first.packageName, staged.replaces?.packageName)
+        // Same key, so nothing to warn about, and nothing committed yet either.
+        assertFalse(staged.keyChanged)
+        library.discard(staged)
+        assertEquals(1, library.entries().size)
+    }
+
+    @Test
+    fun aDifferentSigningKeyIsCaughtBeforeTheFileLands() = runBlocking {
+        val library = ApkLibrary(context)
+        val ownApk = File(context.applicationInfo.sourceDir).toUri()
+        library.add(ownApk).getOrThrow()
+        // The stored fingerprint is what a phone checks against, so pretending
+        // the library holds a different one is exactly the case in the field.
+        val entry = library.entries().single()
+        library.replaceIndexForTest(listOf(entry.copy(certSha256 = "f".repeat(64))))
+
+        val staged = library.stage(ownApk).getOrThrow()
+
+        assertTrue(staged.keyChanged)
+        assertEquals("f".repeat(64), staged.replaces?.certSha256)
+        library.discard(staged)
+    }
+
+    @Test
+    fun theLibraryCanNameTheDeploymentsThatInstallAnApp() {
+        val store = ProfileStore(context)
+        store.save(profile("Rio Negro"))
+        store.save(profile("Xingu").copy(packages = listOf("org.telegram.messenger")))
+
+        assertEquals(listOf("Rio Negro"), store.using("org.example.fieldapp").map { it.name })
+        assertEquals(2, store.using("org.telegram.messenger").size)
+        assertTrue(store.using("org.nobody.uses.this").isEmpty())
+    }
+
+    @Test
     fun removingAnEntryDeletesItsFile() = runBlocking {
         val library = ApkLibrary(context)
         val entry = library.add(File(context.applicationInfo.sourceDir).toUri()).getOrThrow()
@@ -117,10 +162,87 @@ class LibraryAndProfileTest {
         name = name,
         adminPinHash = AdminPin.hash("2468"),
         packages = listOf("org.example.fieldapp", "org.telegram.messenger"),
-        visibleInLauncher = listOf("org.example.fieldapp"),
+        launcher = listOf(LauncherEntry("org.example.fieldapp", LauncherRole.HERO)),
         locale = "pt_BR",
         timeZone = "America/Manaus",
     )
+
+    @Test
+    fun aProfileSavedBeforeRolesExistedKeepsItsHomeScreen() {
+        // Written by a build that only knew visibleInLauncher. Losing it would
+        // silently blank the home screen of every deployment on this phone.
+        File(context.filesDir, "profiles.json").writeText(
+            """
+            [{
+              "id": "old",
+              "name": "Rio Negro",
+              "adminPinHash": "x",
+              "packages": ["org.example.fieldapp", "org.telegram.messenger", "org.example.share"],
+              "visibleInLauncher": ["org.example.fieldapp", "org.telegram.messenger"]
+            }]
+            """.trimIndent(),
+        )
+
+        val profile = ProfileStore(context).get("old")!!
+
+        assertEquals(
+            listOf(
+                LauncherEntry("org.example.fieldapp", LauncherRole.HERO),
+                LauncherEntry("org.telegram.messenger", LauncherRole.SMALL),
+            ),
+            profile.launcher,
+        )
+    }
+
+    @Test
+    fun promotingAnAppToHeroDemotesTheOneThatHadIt() {
+        val profile = profile().copy(
+            launcher = listOf(
+                LauncherEntry("org.example.fieldapp", LauncherRole.HERO),
+                LauncherEntry("org.telegram.messenger", LauncherRole.SMALL),
+            ),
+        )
+
+        val promoted = profile.withEntry(
+            LauncherEntry("org.telegram.messenger", LauncherRole.HERO),
+        )
+
+        assertEquals(1, promoted.launcher.count { it.role == LauncherRole.HERO })
+        assertEquals("org.telegram.messenger", promoted.launcher.single { it.role == LauncherRole.HERO }.packageName)
+        // Order is the home screen's order, so promoting must not reshuffle it.
+        assertEquals(
+            listOf("org.example.fieldapp", "org.telegram.messenger"),
+            promoted.launcher.map { it.packageName },
+        )
+    }
+
+    @Test
+    fun aChosenIconIsShrunkUntilItFitsTheConfigDocument() {
+        // A gallery photo is megapixels; the icon rides inside the config the
+        // QR hashes and a phone fetches over a hotspot.
+        val big = android.graphics.Bitmap.createBitmap(2400, 1600, android.graphics.Bitmap.Config.ARGB_8888)
+        for (x in 0 until 2400 step 3) {
+            for (y in 0 until 1600 step 3) big.setPixel(x, y, (x * 31 + y * 17) or -0x1000000)
+        }
+        val file = File(context.cacheDir, "icon.png").apply {
+            outputStream().use { big.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        }
+
+        val encoded = EntryIcon.encode(context, file.toUri()).getOrThrow()
+
+        assertTrue("encoded to ${encoded.length} chars", encoded.length <= 40_000)
+        val bytes = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT)
+        val decoded = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)!!
+        // Square, because a launcher tile is and a photo is not.
+        assertEquals(decoded.width, decoded.height)
+    }
+
+    @Test
+    fun somethingThatIsNotAPictureIsRefused() {
+        val notAnImage = File(context.cacheDir, "notes.txt").apply { writeText("hello") }
+
+        assertTrue(EntryIcon.encode(context, notAnImage.toUri()).isFailure)
+    }
 
     @Test
     fun profilesRoundTripThroughStorage() {
@@ -165,7 +287,7 @@ class LibraryAndProfileTest {
 
         assertEquals(original.name, imported.name)
         assertEquals(original.packages, imported.packages)
-        assertEquals(original.visibleInLauncher, imported.visibleInLauncher)
+        assertEquals(original.launcher, imported.launcher)
         assertEquals(original.adminPinHash, imported.adminPinHash)
         assertEquals(original.showNotificationShade, imported.showNotificationShade)
         // A new id, so importing a colleague's export cannot silently overwrite

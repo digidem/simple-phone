@@ -1,6 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="launcher_empty">No apps have been set up on this device yet.</string>
+    <string name="launcher_not_set_up">This phone has not been set up</string>
+    <string name="launcher_not_set_up_body">Scan a setup code from the trainer\'s phone to finish.</string>
+    <string name="launcher_setup_unfinished">Setting up this phone did not finish</string>
+    <string name="launcher_setup_unfinished_body">It could not get its settings from the trainer\'s phone.</string>
+    <string name="launcher_no_apps">No apps are showing</string>
+    <string name="launcher_no_apps_body">This phone is set up, but nothing has been chosen to appear here.</string>
+    <string name="launcher_no_apps_hint">A trainer can change this in the admin screen.</string>
+    <string name="launcher_set_up_again">Set this phone up again</string>
+    <string name="launcher_set_up">Set this phone up</string>
+    <string name="launcher_remove_lock">Remove the lock</string>
+    <string name="launcher_test_setup">Set up for testing</string>
+
+    <string name="test_setup_title">Set up for testing</string>
+    <string name="test_setup_help">Choose apps that are already on this phone. The first one you choose becomes the hero. This only writes a deployment locally — nothing is installed, and this phone does not become a locked-down one.</string>
+    <string name="test_setup_pin">The admin PIN will be %1$s.</string>
+    <string name="test_setup_save">Use these</string>
+    <string name="entry_role_hero">Hero</string>
+    <string name="entry_role_small">Small card</string>
+
+    <string name="launcher_no_pin_needed">No PIN is asked for. There is nothing on this phone yet to protect.</string>
 
     <string name="action_ok">OK</string>
     <string name="action_cancel">Cancel</string>
@@ -8,6 +27,7 @@
     <string name="action_save">Save</string>
     <string name="action_install">Install</string>
     <string name="action_unlock">Unlock for 10 minutes</string>
+    <string name="action_unlock_admin">Unlock</string>
     <string name="action_unprovision">Remove the lock</string>
 
     <string name="pin_title">Enter the admin PIN</string>
@@ -21,14 +41,44 @@
     <string name="pin_changed">The admin PIN has been changed.</string>
 
     <string name="admin_title">Admin</string>
-    <string name="admin_device_info">Device information</string>
+    <string name="admin_about">About this phone</string>
+    <string name="admin_about_body">Deployment, versions, what happened during setup</string>
+    <string name="admin_change">Change this phone</string>
+    <string name="admin_change_body">Apps on the home screen, Wi-Fi, admin PIN</string>
+    <string name="admin_wrong">Something is wrong</string>
+    <string name="admin_wrong_body">Re-apply the lock, install an app, unlock temporarily, remove the lock</string>
+    <string name="admin_doors_hint">Recovery lives behind one door so a trainer looking for Wi-Fi never lands next to “Remove the lock” by accident.</string>
+
     <string name="admin_visible_apps">Apps shown on the home screen</string>
+    <string name="admin_visible_apps_body">Choose which of the installed apps appear</string>
     <string name="admin_change_pin">Change the admin PIN</string>
+    <string name="admin_change_pin_body">The PIN that opens this screen</string>
     <string name="admin_wifi">Wi-Fi</string>
-    <string name="admin_reapply_policy">Re-apply the lock settings</string>
+    <string name="admin_wifi_body">Join this phone to a network</string>
+
+    <string name="admin_reapply_policy">Put the lock settings back</string>
+    <string name="admin_reapply_policy_body">If part of the phone stopped behaving as it should</string>
     <string name="admin_install_url">Install an app from a web address</string>
-    <string name="admin_unlock_temporarily">Unlock this device temporarily</string>
-    <string name="admin_unprovision">Remove the lock from this device</string>
+    <string name="admin_install_url_body">Needs the phone to be on a network</string>
+    <string name="admin_unlock_temporarily">Unlock this phone for 10 minutes</string>
+    <string name="admin_unlock_temporarily_body">Locks itself again afterwards, so it cannot be left open</string>
+    <string name="admin_last_resort">Last resort</string>
+    <string name="admin_unprovision">Remove the lock from this phone</string>
+    <string name="admin_unprovision_body">Turns it back into a normal phone. Cannot be undone.</string>
+
+    <string name="about_healthy">This phone is set up correctly</string>
+    <string name="about_healthy_body">Everything installed, and the lock is on.</string>
+    <string name="about_not_healthy">Setting this phone up did not finish</string>
+    <string name="about_not_healthy_body">Look under “Something is wrong” for what to try.</string>
+    <string name="about_not_locked">The lock is not on this phone</string>
+    <string name="about_not_set_up">This phone has not been set up</string>
+    <string name="about_not_set_up_body">It has no deployment settings, so nothing has been applied to it.</string>
+    <string name="about_deployment">Deployment</string>
+    <string name="about_apps">Apps</string>
+    <string name="about_this_phone">This phone</string>
+    <string name="about_make_and_model">Make and model</string>
+    <string name="about_not_installed">Not installed</string>
+    <string name="about_signing_key_body">A test key will not take production updates</string>
     <string name="admin_working">%1$s…</string>
     <string name="admin_no_config">This device has not been set up.</string>
     <string name="admin_not_device_owner">This app is not the device owner, so it cannot change the lock settings. The device needs to be set up again from the trainer\'s phone.</string>
@@ -36,21 +86,16 @@
     <string name="admin_reapply_partial">Some settings could not be applied: %1$s</string>
     <string name="admin_unprovision_failed">The lock could not be removed from this device. Erase the device and set it up again from the trainer\'s phone.</string>
 
-    <string name="admin_unlock_explain">The home screen lock will be turned off so you can use the rest of the device. It will turn itself back on after 10 minutes, so the device cannot be left unlocked by accident.</string>
-    <string name="admin_unprovision_explain">This turns the device back into a normal Android phone. The home screen lock is removed, apps can be uninstalled again, and settings are no longer protected.\n\nThis cannot be undone. Putting the lock back requires erasing the phone completely and setting it up again from the trainer\'s phone.</string>
+    <string name="admin_unlock_explain">The home screen lock will be turned off so you can use the rest of the phone. It will turn itself back on after 10 minutes, so the phone cannot be left unlocked by accident.</string>
+    <string name="admin_unprovision_explain">It becomes a normal Android phone. The home screen lock goes, apps can be uninstalled again, and settings are no longer protected.\n\nThis cannot be undone. Putting the lock back means erasing the phone completely and setting it up again from the trainer\'s phone.</string>
 
     <string name="info_device_label">Device code</string>
-    <string name="info_manufacturer">Make</string>
-    <string name="info_model">Model</string>
     <string name="info_android">Android version</string>
     <string name="info_kiosk_version">Kiosk version</string>
     <string name="info_build_variant">Signing key</string>
-    <string name="info_app_version">Installed app</string>
+    <string name="deployment_locale">Language</string>
     <string name="info_deployment">Deployment</string>
     <string name="info_deployment_id">Deployment ID</string>
-    <string name="info_device_owner">Device owner</string>
-    <string name="info_hostile_oem">Battery settings need a manual step on this make</string>
-    <string name="info_last_failures">Problems during setup</string>
 
     <string name="wifi_enabled">Wi-Fi on</string>
     <string name="wifi_ssid">Network name</string>

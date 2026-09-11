@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -20,7 +21,7 @@ import kotlinx.coroutines.launch
 class LauncherActivity : ComponentActivity() {
 
     private var screen by mutableStateOf(Screen.Home)
-    private var apps by mutableStateOf(emptyList<LaunchableApp>())
+    private var home by mutableStateOf<HomeState>(HomeState.Apps(hero = null, small = emptyList()))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,9 +36,21 @@ class LauncherActivity : ComponentActivity() {
             KioskTheme {
                 when (screen) {
                     Screen.Home -> HomeScreen(
-                        apps = apps,
+                        state = home,
                         onLaunch = ::launchApp,
+                        onSetUpAgain = ::setUpAgain,
+                        onRemoveLock = ::removeLock,
                         onAdminGesture = { screen = Screen.PinEntry },
+                        onSetUpForTesting = { screen = Screen.TestSetup }
+                            .takeIf { canSetUpForTesting(this) },
+                    )
+
+                    Screen.TestSetup -> TestSetupScreen(
+                        onDone = {
+                            screen = Screen.Home
+                            lifecycleScope.launch { home = homeState(this@LauncherActivity) }
+                        },
+                        onCancel = { screen = Screen.Home },
                     )
 
                     Screen.PinEntry -> PinEntryScreen(
@@ -55,7 +68,27 @@ class LauncherActivity : ComponentActivity() {
         super.onStart()
         // Refreshed on every start rather than once: the admin screen can
         // change which apps are visible, and the updater can install new ones.
-        lifecycleScope.launch { apps = AppList.load(this@LauncherActivity) }
+        lifecycleScope.launch { home = homeState(this@LauncherActivity) }
+    }
+
+    /**
+     * Re-runs the config fetch against the bootstrap the failed attempt kept.
+     *
+     * The service does the work in the background and this activity may never
+     * stop while it runs, so `onStart` alone would leave the failure screen up
+     * on a phone that had just recovered. It watches until the state changes
+     * instead.
+     */
+    private fun setUpAgain() {
+        if (!setUpAgain(this)) return
+        lifecycleScope.launch {
+            val before = home
+            repeat(RETRY_POLLS) {
+                delay(RETRY_POLL_MS)
+                home = homeState(this@LauncherActivity)
+                if (home != before) return@launch
+            }
+        }
     }
 
     override fun onStop() {
@@ -65,10 +98,29 @@ class LauncherActivity : ComponentActivity() {
         if (screen != Screen.Home) screen = Screen.Home
     }
 
+    /**
+     * No PIN gate, deliberately: with no config there is no admin PIN to check,
+     * so a gate could never open and the phone would need ADB or a factory
+     * reset. It is also still in the deployer's hands, with nothing on it yet.
+     */
+    private fun removeLock() {
+        stopLockTask()
+        lifecycleScope.launch {
+            unprovision(this@LauncherActivity)
+            home = homeState(this@LauncherActivity)
+        }
+    }
+
     private fun launchApp(packageName: String) {
         val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return
         startActivity(intent)
     }
 
-    enum class Screen { Home, PinEntry, Admin }
+    enum class Screen { Home, TestSetup, PinEntry, Admin }
+
+    private companion object {
+        /** Long enough to cover a payload download over a hotspot. */
+        const val RETRY_POLLS = 150
+        const val RETRY_POLL_MS = 2_000L
+    }
 }

@@ -4,7 +4,10 @@ import android.content.Context
 import android.util.Log
 import kotlinx.serialization.Serializable
 import org.awana.kiosk.shared.KioskJson
+import org.awana.kiosk.shared.LauncherEntry
+import org.awana.kiosk.shared.LauncherRole
 import org.awana.kiosk.shared.WifiNetwork
+import org.awana.kiosk.shared.withEntry
 import java.io.File
 import java.util.UUID
 
@@ -20,7 +23,11 @@ data class DeploymentProfile(
     val adminPinHash: String,
     /** Package names, in the order they should appear. */
     val packages: List<String> = emptyList(),
-    val visibleInLauncher: List<String> = emptyList(),
+    /** How each app appears on the launcher; see [org.awana.kiosk.shared.KioskConfig.launcher]. */
+    val launcher: List<LauncherEntry> = emptyList(),
+    /** Profiles written before [launcher] existed. Read by [ProfileStore] only. */
+    @Deprecated("Replaced by launcher", ReplaceWith("launcher"))
+    val visibleInLauncher: List<String>? = null,
     val locale: String = "en",
     val timeZone: String = "UTC",
     val screenOffTimeoutMs: Long = 120_000,
@@ -35,6 +42,32 @@ data class DeploymentProfile(
 ) {
     fun duplicate(): DeploymentProfile =
         copy(id = UUID.randomUUID().toString(), name = "$name (copy)")
+
+    fun entryFor(packageName: String): LauncherEntry? =
+        launcher.firstOrNull { it.packageName == packageName }
+
+    fun withEntry(entry: LauncherEntry): DeploymentProfile = copy(launcher = launcher.withEntry(entry))
+
+    fun withoutEntry(packageName: String): DeploymentProfile =
+        copy(launcher = launcher.filterNot { it.packageName == packageName })
+}
+
+@Suppress("DEPRECATION")
+private fun DeploymentProfile.migrated(): DeploymentProfile {
+    val legacy = visibleInLauncher.orEmpty()
+    if (launcher.isNotEmpty() || legacy.isEmpty()) {
+        return if (visibleInLauncher == null) this else copy(visibleInLauncher = null)
+    }
+    val visible = packages.filter { it in legacy }
+    return copy(
+        launcher = visible.mapIndexed { index, packageName ->
+            LauncherEntry(
+                packageName = packageName,
+                role = if (index == 0) LauncherRole.HERO else LauncherRole.SMALL,
+            )
+        },
+        visibleInLauncher = null,
+    )
 }
 
 /**
@@ -62,6 +95,13 @@ class ProfileStore(context: Context) {
     }
 
     fun get(id: String): DeploymentProfile? = all().firstOrNull { it.id == id }
+
+    /**
+     * The deployments that install [packageName]. Taking the file away breaks
+     * every one of them, so removal has to be able to name them.
+     */
+    fun using(packageName: String): List<DeploymentProfile> =
+        all().filter { packageName in it.packages }
 
     fun save(profile: DeploymentProfile) {
         val others = all().filterNot { it.id == profile.id }
@@ -106,11 +146,11 @@ object Json {
         format.decodeFromString(
             kotlinx.serialization.builtins.ListSerializer(DeploymentProfile.serializer()),
             text,
-        )
+        ).map { it.migrated() }
 
     fun encodeProfile(profile: DeploymentProfile): String =
         format.encodeToString(DeploymentProfile.serializer(), profile)
 
     fun decodeProfile(text: String): DeploymentProfile =
-        format.decodeFromString(DeploymentProfile.serializer(), text)
+        format.decodeFromString(DeploymentProfile.serializer(), text).migrated()
 }

@@ -4,55 +4,87 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import org.awana.kiosk.design.okColors
 
 /**
- * The live session: the QR to scan, and the dashboard of devices that have
- * reported back.
+ * The live session: the code to scan, the three steps written out, and one line
+ * about how it is going.
  *
- * The dashboard is a core feature rather than telemetry — it is what tells a
- * non-engineer that four of six phones are done and that it is safe to stop.
+ * There is deliberately no total and no completion state. The app never learns
+ * how many phones a trainer means to set up, so it must not invent a
+ * denominator or take the code away. "Safe to stop" means nothing is in flight,
+ * which is derivable; "you are finished" is not.
  */
 @Composable
 fun SessionScreen(profileId: String, onFinished: () -> Unit) {
     val context = LocalContext.current
     val state by SessionService.session.state.collectAsState()
     var permissionRefused by remember { mutableStateOf(false) }
+    var route by remember { mutableStateOf<SessionRoute>(SessionRoute.Session) }
+    var confirmStop by remember { mutableStateOf(false) }
+
+    // Silence is what makes a phone "stopped responding", so the screen has to
+    // re-read the clock even when nothing arrives.
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(TICK_MS)
+        }
+    }
 
     val request = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -75,171 +107,353 @@ fun SessionScreen(profileId: String, onFinished: () -> Unit) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-            .testTag(TAG_SESSION),
-    ) {
-        val error = state.error
-        val payload = state.qrPayload
+    val stop = {
+        SessionService.stop(context)
+        onFinished()
+    }
+    val attemptStop = {
+        if (state.inFlight(now).isEmpty()) stop() else confirmStop = true
+    }
 
-        when {
-            error != null || permissionRefused -> ManualFallback(
-                message = error ?: stringResource(R.string.session_permission_refused),
-                onStart = { ssid, passphrase ->
-                    permissionRefused = false
-                    SessionService.startManual(context, profileId, ssid, passphrase)
-                },
-                onCancel = {
-                    SessionService.stop(context)
-                    onFinished()
-                },
+    when (val here = route) {
+        SessionRoute.Session -> SessionBody(
+            state = state,
+            now = now,
+            permissionRefused = permissionRefused,
+            onManualStart = { ssid, passphrase ->
+                permissionRefused = false
+                SessionService.startManual(context, profileId, ssid, passphrase)
+            },
+            onOpenPhones = { route = SessionRoute.Phones },
+            onStop = attemptStop,
+            onCancel = stop,
+        )
+
+        SessionRoute.Phones -> {
+            BackHandler { route = SessionRoute.Session }
+            PhonesScreen(
+                phones = state.phones(now),
+                onOpen = { route = SessionRoute.Detail(it.deviceId) },
+                onBack = { route = SessionRoute.Session },
             )
+        }
 
-            payload == null -> Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth().padding(48.dp),
-            ) {
-                CircularProgressIndicator()
-                Text(
-                    text = stringResource(R.string.session_waiting),
-                    modifier = Modifier.padding(top = 16.dp),
+        is SessionRoute.Detail -> {
+            BackHandler { route = SessionRoute.Phones }
+            val report = state.reports.firstOrNull { it.deviceId == here.deviceId }
+            if (report == null) {
+                LaunchedEffect(here.deviceId) { route = SessionRoute.Phones }
+            } else {
+                PhoneDetailScreen(
+                    report = report,
+                    expected = rememberExpectedApps(profileId),
+                    onBack = { route = SessionRoute.Phones },
                 )
             }
-
-            else -> QrPanel(payload = payload, state = state)
         }
+    }
 
-        if (state.running) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-            Dashboard(state = state)
-        }
-
-        OutlinedButton(
-            onClick = {
-                SessionService.stop(context)
-                onFinished()
+    if (confirmStop) {
+        val busy = state.inFlight(now).size
+        AlertDialog(
+            onDismissRequest = { confirmStop = false },
+            icon = {
+                Icon(
+                    painter = painterResource(R.drawable.ic_warning),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                )
             },
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp).testTag(TAG_SESSION_STOP),
-        ) { Text(stringResource(R.string.session_stop)) }
+            title = {
+                Text(pluralStringResource(R.plurals.session_stop_confirm_title, busy, busy))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.session_stop_confirm_body))
+                    Text(stringResource(R.string.session_stop_confirm_wait))
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { confirmStop = false; stop() },
+                    modifier = Modifier.testTag(TAG_STOP_ANYWAY),
+                ) {
+                    Text(
+                        text = stringResource(R.string.session_stop_anyway),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmStop = false }) {
+                    Text(stringResource(R.string.session_stop_keep_going))
+                }
+            },
+            modifier = Modifier.testTag(TAG_STOP_CONFIRM),
+        )
+    }
+}
+
+/** Internal rather than private so its four states can be driven directly. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun SessionBody(
+    state: SessionState,
+    now: Long,
+    permissionRefused: Boolean,
+    onManualStart: (String, String) -> Unit,
+    onOpenPhones: () -> Unit,
+    onStop: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val busy = state.inFlight(now).isNotEmpty()
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(state.profileName.ifBlank { stringResource(R.string.session_title) }) },
+                navigationIcon = {
+                    IconButton(onClick = onStop, modifier = Modifier.testTag(TAG_SESSION_CLOSE)) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_close),
+                            contentDescription = stringResource(R.string.session_stop),
+                        )
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            Surface(tonalElevation = 3.dp) {
+                OutlinedButton(
+                    onClick = onStop,
+                    colors = if (busy) {
+                        ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        ButtonDefaults.outlinedButtonColors()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .testTag(TAG_SESSION_STOP),
+                ) {
+                    Text(
+                        stringResource(
+                            if (busy) R.string.session_stop_busy else R.string.session_stop,
+                        ),
+                    )
+                }
+            }
+        },
+        modifier = Modifier.testTag(TAG_SESSION),
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        ) {
+            val error = state.error
+            val payload = state.qrPayload
+
+            when {
+                error != null || permissionRefused -> ManualFallback(
+                    message = error ?: stringResource(R.string.session_permission_refused),
+                    onStart = onManualStart,
+                    onCancel = onCancel,
+                )
+
+                payload == null -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth().padding(48.dp),
+                ) {
+                    CircularProgressIndicator()
+                    Text(
+                        text = stringResource(R.string.session_waiting),
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                }
+
+                else -> {
+                    Qr(payload)
+                    Steps()
+                    Status(
+                        state = state,
+                        now = now,
+                        onOpen = onOpenPhones,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun QrPanel(payload: String, state: SessionState) {
+private fun Qr(payload: String) {
     val tooBig = payload.toByteArray().size > QrPayload.COMFORTABLE_BYTES
     val bitmap = remember(payload) { runCatching { QrPayload.render(payload) }.getOrNull() }
 
-    Text(
-        text = stringResource(R.string.session_scan),
-        style = MaterialTheme.typography.titleMedium,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth(),
-    )
-
     if (tooBig || bitmap == null) {
-        Card(modifier = Modifier.fillMaxWidth().padding(top = 16.dp).testTag(TAG_QR_TOO_BIG)) {
+        Card(modifier = Modifier.fillMaxWidth().testTag(TAG_QR_TOO_BIG)) {
             Text(
                 text = stringResource(R.string.session_qr_too_big),
                 modifier = Modifier.padding(16.dp),
             )
         }
-    } else {
-        Image(
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            // Nearest-neighbour scaling: a smoothed QR scans noticeably worse.
-            filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .padding(top = 16.dp)
-                .testTag(TAG_QR),
-        )
+        return
     }
 
-    Text(
-        text = stringResource(R.string.session_requires_android9),
-        style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.padding(top = 8.dp),
-    )
-    state.hotspot?.let {
-        Text(stringResource(R.string.session_network, it.ssid), style = MaterialTheme.typography.bodySmall)
-    }
-    state.serverUrl?.let {
-        Text(stringResource(R.string.session_server, it), style = MaterialTheme.typography.bodySmall)
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        // The one colour here that is not a theme role: a camera needs a light
+        // quiet zone around the code, in dark mode as much as light.
+        Surface(color = Color.White, modifier = Modifier.size(QR_SIZE + 20.dp)) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                // Nearest-neighbour scaling: a smoothed QR scans noticeably worse.
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
+                modifier = Modifier.size(QR_SIZE).padding(10.dp).testTag(TAG_QR),
+            )
+        }
     }
 }
 
 @Composable
-private fun Dashboard(state: SessionState) {
-    Text(
-        text = stringResource(R.string.session_progress, state.succeeded, state.enrolled),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.testTag(TAG_PROGRESS),
-    )
+private fun Steps() {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Step(1, R.string.session_step_1)
+            Step(2, R.string.session_step_2, figure = true)
+            Step(3, R.string.session_step_3)
+        }
+    }
+}
 
-    if (state.enrolled > 0 && state.succeeded == state.enrolled) {
+@Composable
+private fun Step(number: Int, text: Int, figure: Boolean = false) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shape = CircleShape,
+            modifier = Modifier.size(24.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text("$number", style = MaterialTheme.typography.labelMedium)
+            }
+        }
         Text(
-            text = stringResource(R.string.session_safe_to_stop),
+            // The copy bolds the words a trainer must not skim past, so the
+            // markup has to be rendered rather than shown.
+            text = AnnotatedString.fromHtml(stringResource(text)),
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 8.dp).testTag(TAG_SAFE_TO_STOP),
+            modifier = Modifier.weight(1f),
         )
+        if (figure) {
+            Icon(
+                painter = painterResource(R.drawable.ic_tap_six_times),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(width = 42.dp, height = 52.dp),
+            )
+        }
+    }
+}
+
+/**
+ * One component, four states, chosen by what is most worth knowing: a problem
+ * beats anything in flight beats everything finished beats nothing yet. The
+ * second line carries whatever the headline displaced, so no count is lost.
+ */
+@Composable
+private fun Status(
+    state: SessionState,
+    now: Long,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val status = state.status(now)
+    val busy = state.inFlight(now).size
+    val colors = MaterialTheme.colorScheme
+
+    val container = when (status) {
+        SessionStatus.Idle -> colors.surfaceContainerHigh
+        SessionStatus.InProgress -> colors.secondaryContainer
+        SessionStatus.Complete -> MaterialTheme.okColors.container
+        SessionStatus.Problem -> colors.errorContainer
+    }
+    val onContainer = when (status) {
+        SessionStatus.Idle -> colors.onSurface
+        SessionStatus.InProgress -> colors.onSecondaryContainer
+        SessionStatus.Complete -> MaterialTheme.okColors.onContainer
+        SessionStatus.Problem -> colors.onErrorContainer
+    }
+    val headline = when (status) {
+        SessionStatus.Idle -> stringResource(R.string.session_idle)
+        SessionStatus.InProgress -> pluralStringResource(R.plurals.session_busy, busy, busy)
+        SessionStatus.Complete ->
+            pluralStringResource(R.plurals.session_done, state.succeeded, state.succeeded)
+        SessionStatus.Problem ->
+            pluralStringResource(R.plurals.session_problem, state.failed, state.failed)
+    }
+    val body = when (status) {
+        SessionStatus.Idle -> stringResource(R.string.session_idle_body)
+        SessionStatus.InProgress -> stringResource(R.string.session_busy_body, state.enrolled)
+        SessionStatus.Complete -> stringResource(R.string.session_done_body)
+        SessionStatus.Problem -> stringResource(R.string.session_problem_body, state.succeeded)
     }
 
-    // A plain Column, not a LazyColumn: this sits inside a verticalScroll, which
-    // measures with infinite height and makes any lazy list throw. A session is
-    // a handful of phones, so there is nothing to virtualise.
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        state.reports.forEach { report ->
-            ListItem(
-                headlineContent = {
-                    Text(
-                        stringResource(
-                            R.string.report_device,
-                            report.deviceLabel,
-                            report.manufacturer,
-                            report.model,
-                        ),
-                    )
-                },
-                supportingContent = {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = stringResource(
-                                if (report.succeeded) R.string.report_ok else R.string.report_failed,
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        report.installed.forEach {
-                            Text(
-                                "${it.packageName} ${it.versionName.orEmpty()}",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        report.failures.forEach {
-                            Text(it, style = MaterialTheme.typography.bodySmall)
-                        }
-                        report.permissionFailures.forEach {
-                            Text(
-                                text = stringResource(R.string.report_permission_failed, it),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        if (report.hostileOem != null) {
-                            Text(
-                                text = stringResource(R.string.report_battery_warning),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                },
-                modifier = Modifier.testTag("report-${report.deviceId}"),
-            )
-            HorizontalDivider()
+    Surface(
+        color = container,
+        contentColor = onContainer,
+        shape = MaterialTheme.shapes.medium,
+        // Idle alone has nothing to open, so idle alone is not a target.
+        onClick = onOpen,
+        enabled = status != SessionStatus.Idle,
+        modifier = modifier.fillMaxWidth().testTag(TAG_STATUS),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+        ) {
+            Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                when (status) {
+                    SessionStatus.InProgress -> CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    SessionStatus.Problem -> Glyph(R.drawable.ic_warning, onContainer)
+                    SessionStatus.Complete -> Glyph(R.drawable.ic_check, onContainer)
+                    SessionStatus.Idle -> Glyph(R.drawable.ic_phone_quiet, onContainer)
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(headline, style = MaterialTheme.typography.titleMedium)
+                Text(body, style = MaterialTheme.typography.bodyMedium)
+            }
+            if (status != SessionStatus.Idle) {
+                Glyph(R.drawable.ic_chevron_right, onContainer)
+            }
+        }
+    }
+}
+
+@Composable
+private fun rememberExpectedApps(profileId: String): Map<String, String> {
+    val context = LocalContext.current
+    return remember(profileId) {
+        val profile = ProfileStore(context).get(profileId)
+        val library = ApkLibrary(context)
+        profile?.packages.orEmpty().associateWith { packageName ->
+            library.find(packageName)?.label ?: packageName
         }
     }
 }
@@ -291,6 +505,12 @@ private fun ManualFallback(
     }
 }
 
+private sealed interface SessionRoute {
+    data object Session : SessionRoute
+    data object Phones : SessionRoute
+    data class Detail(val deviceId: String) : SessionRoute
+}
+
 /**
  * `startLocalOnlyHotspot` is refused outright without this, which is what made
  * every session fall through to the manual hotspot. The permission it wants
@@ -313,12 +533,17 @@ private fun sessionPermissions(): Array<String> =
 private fun hasPermission(context: Context, permission: String): Boolean =
     context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
+private val QR_SIZE = 240.dp
+private const val TICK_MS = 15_000L
+
 const val TAG_SESSION = "session"
 const val TAG_QR = "session-qr"
 const val TAG_QR_TOO_BIG = "session-qr-too-big"
-const val TAG_PROGRESS = "session-progress"
-const val TAG_SAFE_TO_STOP = "session-safe-to-stop"
+const val TAG_STATUS = "session-status"
 const val TAG_SESSION_STOP = "session-stop"
+const val TAG_SESSION_CLOSE = "session-close"
+const val TAG_STOP_CONFIRM = "session-stop-confirm"
+const val TAG_STOP_ANYWAY = "session-stop-anyway"
 const val TAG_MANUAL = "session-manual"
 const val TAG_MANUAL_SSID = "session-manual-ssid"
 const val TAG_MANUAL_PASSPHRASE = "session-manual-passphrase"

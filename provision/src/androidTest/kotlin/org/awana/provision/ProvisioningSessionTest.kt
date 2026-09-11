@@ -22,6 +22,8 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import org.awana.kiosk.shared.LauncherEntry
+import org.awana.kiosk.shared.LauncherRole
 
 /**
  * A whole session against a hotspot that is already up: the QR the trainer
@@ -57,7 +59,7 @@ class ProvisioningSessionTest {
         name = name,
         adminPinHash = AdminPin.hash("246813"),
         packages = listOf(payloadPackage),
-        visibleInLauncher = listOf(payloadPackage),
+        launcher = listOf(LauncherEntry(payloadPackage, LauncherRole.HERO)),
         locale = "pt_BR",
         timeZone = "America/Manaus",
     )

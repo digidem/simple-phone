@@ -102,12 +102,17 @@ listOf("debug", "release").forEach { variant ->
         into(layout.buildDirectory.dir("generated/kioskAssets/$variant"))
         rename { "kiosk.apk" }
     }
-    tasks.matching { it.name == "merge${variant.replaceFirstChar { it.uppercase() }}Assets" }
-        .configureEach { dependsOn(bundle) }
+    // Lint reads the generated asset directory too, and only lintVital (release)
+    // ever noticed: without this the release build fails configuration checks.
+    val v = variant.replaceFirstChar { it.uppercase() }
+    tasks.matching {
+        it.name == "merge${v}Assets" || (it.name.lowercase().contains("lint") && it.name.contains(v))
+    }.configureEach { dependsOn(bundle) }
 }
 
 dependencies {
     implementation(project(":shared"))
+    implementation(project(":design"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

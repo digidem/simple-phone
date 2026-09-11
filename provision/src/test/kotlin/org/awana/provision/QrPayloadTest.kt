@@ -11,6 +11,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import org.awana.kiosk.shared.LauncherEntry
+import org.awana.kiosk.shared.LauncherRole
 
 /**
  * The provisioning QR, against a fixture.
@@ -28,7 +30,7 @@ class QrPayloadTest {
         adminPinHash = "pbkdf2_sha256\$120000\$c2FsdHNhbHRzYWx0c2E9PQ==\$aGFzaGhhc2hoYXNoaGFzaA==",
         serverUrl = "http://192.168.43.1:8080",
         packages = packages,
-        visibleInLauncher = listOf("org.example.fieldapp"),
+        launcher = listOf(LauncherEntry("org.example.fieldapp", LauncherRole.HERO)),
         showNotificationShade = false,
         locale = "pt_BR",
         screenOffTimeoutMs = 120_000,
@@ -169,7 +171,7 @@ class QrPayloadTest {
         // If any of this leaks back into the QR, the size problem returns.
         assertTrue(!payload.contains("adminPinHash"))
         assertTrue(!payload.contains("org.telegram.messenger"))
-        assertTrue(!payload.contains("visibleInLauncher"))
+        assertTrue(!payload.contains("launcher"))
     }
 
     @Test

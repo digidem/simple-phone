@@ -18,6 +18,8 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import org.awana.kiosk.shared.LauncherEntry
+import org.awana.kiosk.shared.LauncherRole
 
 /**
  * The four endpoints a device needs while enrolling.
@@ -48,7 +50,7 @@ class ProvisioningServerTest {
             packages = listOf(
                 PackageSpec("org.example.fieldapp", "a".repeat(64), "/apks/org.example.fieldapp.apk"),
             ),
-            visibleInLauncher = listOf("org.example.fieldapp"),
+            launcher = listOf(LauncherEntry("org.example.fieldapp", LauncherRole.HERO)),
         ),
     )
 
@@ -73,7 +75,7 @@ class ProvisioningServerTest {
             payload = listOf(ProvisioningServer.ServedApk("org.example.fieldapp", payloadApk)),
             manifest = manifest,
             configJson = configJson,
-            onReport = { received += it },
+            onReport = { _, report -> received += report },
         )
         server.start(5_000, false)
         base = "http://127.0.0.1:${server.listeningPort}"

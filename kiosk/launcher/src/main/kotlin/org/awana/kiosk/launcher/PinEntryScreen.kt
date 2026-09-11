@@ -1,17 +1,17 @@
 package org.awana.kiosk.launcher
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,19 +27,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import org.awana.kiosk.policy.ConfigStore
-import org.awana.kiosk.policy.PinGate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.awana.kiosk.policy.ConfigStore
+import org.awana.kiosk.policy.PinGate
 
 /**
- * Numeric PIN entry, on the app's own keypad rather than the system keyboard —
- * the IME is another surface a locked-down device does not need.
+ * Numeric PIN entry.
+ *
+ * A stock field with a number-password keyboard rather than a keypad of this
+ * app's own: a bespoke twelve-key pad is a custom component with its own
+ * layout, state and disabled handling, and the system keyboard is available in
+ * lock task anyway. [PinGate] and its backoff are untouched.
  */
 @Composable
 fun PinEntryScreen(onUnlocked: () -> Unit, onCancel: () -> Unit) {
@@ -60,6 +66,8 @@ fun PinEntryScreen(onUnlocked: () -> Unit, onCancel: () -> Unit) {
         }
     }
 
+    val enabled = lockoutMs == 0L && !checking
+
     fun submit() {
         val encoded = hash
         if (encoded == null) {
@@ -70,7 +78,7 @@ fun PinEntryScreen(onUnlocked: () -> Unit, onCancel: () -> Unit) {
         scope.launch {
             checking = true
             // 120k PBKDF2 iterations: on the main thread this freezes the
-            // keypad for long enough to look broken on a budget phone.
+            // screen for long enough to look broken on a budget phone.
             val ok = withContext(Dispatchers.Default) { gate.check(entered, encoded) }
             checking = false
             if (ok) {
@@ -98,13 +106,23 @@ fun PinEntryScreen(onUnlocked: () -> Unit, onCancel: () -> Unit) {
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Spacer(Modifier.height(24.dp))
-            Text(
-                text = "•".repeat(entered.length),
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.testTag(TAG_PIN_DOTS),
+
+            OutlinedTextField(
+                value = entered,
+                onValueChange = { entered = it.filter(Char::isDigit).take(MAX_PIN) },
+                enabled = enabled,
+                singleLine = true,
+                // Never in clear: a trainer types this in front of the people
+                // the lock is meant to keep out.
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.NumberPassword,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(onDone = { submit() }),
+                isError = error != null,
+                modifier = Modifier.fillMaxWidth().testTag(TAG_PIN_FIELD),
             )
-            Spacer(Modifier.height(16.dp))
 
             val message = when {
                 lockoutMs > 0 -> stringResource(R.string.pin_locked_out, (lockoutMs / 1000) + 1)
@@ -118,17 +136,17 @@ fun PinEntryScreen(onUnlocked: () -> Unit, onCancel: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
+                    .padding(top = 8.dp)
                     .testTag(TAG_PIN_MESSAGE),
             )
 
-            Keypad(
-                enabled = lockoutMs == 0L && !checking,
-                onDigit = { if (entered.length < MAX_PIN) entered += it },
-                onDelete = { entered = entered.dropLast(1) },
-                onSubmit = ::submit,
-            )
+            Button(
+                onClick = ::submit,
+                enabled = enabled && entered.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth().testTag(TAG_PIN_SUBMIT),
+            ) { Text(stringResource(R.string.action_unlock_admin)) }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
             TextButton(onClick = onCancel, modifier = Modifier.testTag(TAG_PIN_CANCEL)) {
                 Text(stringResource(R.string.action_cancel))
             }
@@ -136,46 +154,10 @@ fun PinEntryScreen(onUnlocked: () -> Unit, onCancel: () -> Unit) {
     }
 }
 
-@Composable
-private fun Keypad(
-    enabled: Boolean,
-    onDigit: (Char) -> Unit,
-    onDelete: () -> Unit,
-    onSubmit: () -> Unit,
-) {
-    val rows = listOf("123", "456", "789")
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        rows.forEach { row ->
-            Row {
-                row.forEach { digit -> KeyButton(digit.toString(), enabled) { onDigit(digit) } }
-            }
-        }
-        Row {
-            KeyButton("⌫", enabled, onClick = onDelete)
-            KeyButton("0", enabled) { onDigit('0') }
-            KeyButton("✓", enabled, onClick = onSubmit)
-        }
-    }
-}
-
-@Composable
-private fun KeyButton(label: String, enabled: Boolean, onClick: () -> Unit) {
-    Box(modifier = Modifier.padding(6.dp)) {
-        Button(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = Modifier
-                .size(76.dp)
-                .testTag("pin-key-$label"),
-        ) {
-            Text(label, fontSize = 24.sp)
-        }
-    }
-}
-
 private const val MAX_PIN = 12
 
 const val TAG_PIN_SCREEN = "pin-screen"
-const val TAG_PIN_DOTS = "pin-dots"
+const val TAG_PIN_FIELD = "pin-field"
 const val TAG_PIN_MESSAGE = "pin-message"
+const val TAG_PIN_SUBMIT = "pin-submit"
 const val TAG_PIN_CANCEL = "pin-cancel"

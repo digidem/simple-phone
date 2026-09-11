@@ -8,6 +8,8 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.awana.kiosk.policy.ConfigStore
@@ -41,7 +43,7 @@ class PinEntryScreenTest {
     }
 
     private fun type(digits: String) {
-        digits.forEach { compose.onNodeWithTag("pin-key-$it").performClick() }
+        compose.onNodeWithTag(TAG_PIN_FIELD).performTextReplacement(digits)
     }
 
     @Test
@@ -50,7 +52,7 @@ class PinEntryScreenTest {
         compose.setContent { KioskTheme { PinEntryScreen(onUnlocked = { unlocked = true }, onCancel = {}) } }
 
         type(PIN)
-        compose.onNodeWithTag("pin-key-✓").performClick()
+        compose.onNodeWithTag(TAG_PIN_SUBMIT).performClick()
 
         // The check runs off the main thread, so waitForIdle alone would race it.
         compose.waitUntil(CHECK_TIMEOUT_MS) { unlocked }
@@ -63,12 +65,12 @@ class PinEntryScreenTest {
         compose.setContent { KioskTheme { PinEntryScreen(onUnlocked = { unlocked = true }, onCancel = {}) } }
 
         type("0000")
-        compose.onNodeWithTag("pin-key-✓").performClick()
+        compose.onNodeWithTag(TAG_PIN_SUBMIT).performClick()
 
         // The check clears what was typed when it refuses it; waiting for that
         // is what tells the test the off-thread check has finished.
         compose.waitUntil(CHECK_TIMEOUT_MS) {
-            compose.onNodeWithTag(TAG_PIN_DOTS).textOrNull().isNullOrEmpty()
+            compose.onNodeWithTag(TAG_PIN_FIELD).editableTextOrNull().isNullOrEmpty()
         }
         assertFalse(unlocked)
     }
@@ -80,12 +82,25 @@ class PinEntryScreenTest {
         type("1234")
         compose.waitForIdle()
 
-        // Only dots, so the PIN cannot be read over a trainer's shoulder.
-        compose.onNodeWithTag(TAG_PIN_DOTS).assertTextEquals("••••")
+        // The password transformation runs before semantics, so not even the
+        // accessibility tree carries the digits — nothing on this screen can be
+        // read over a trainer's shoulder.
+        assertEquals("••••", compose.onNodeWithTag(TAG_PIN_FIELD).editableTextOrNull())
     }
 
     @Test
-    fun theKeypadIsDisabledDuringABackoff() {
+    fun onlyDigitsGetIn() {
+        compose.setContent { KioskTheme { PinEntryScreen(onUnlocked = {}, onCancel = {}) } }
+
+        compose.onNodeWithTag(TAG_PIN_FIELD).performTextInput("12ab34")
+        compose.waitForIdle()
+
+        // Four dots, not six: the letters never made it into the field.
+        assertEquals("••••", compose.onNodeWithTag(TAG_PIN_FIELD).editableTextOrNull())
+    }
+
+    @Test
+    fun theFieldIsDisabledDuringABackoff() {
         val gate = PinGate(context)
         val hash = ConfigStore(context).load()!!.adminPinHash
         repeat(PinGate.FREE_ATTEMPTS + 1) { gate.check("0000", hash) }
@@ -93,7 +108,7 @@ class PinEntryScreenTest {
         compose.setContent { KioskTheme { PinEntryScreen(onUnlocked = {}, onCancel = {}) } }
         compose.waitForIdle()
 
-        compose.onNodeWithTag("pin-key-1").assertIsNotEnabled()
+        compose.onNodeWithTag(TAG_PIN_FIELD).assertIsNotEnabled()
     }
 
     @Test
@@ -120,9 +135,10 @@ private fun androidx.compose.ui.test.SemanticsNodeInteraction.textOrNull(): Stri
         .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)
         ?.joinToString("") { it.text }
 
-private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertTextEquals(expected: String) {
-    org.junit.Assert.assertEquals(expected, textOrNull())
-}
+private fun androidx.compose.ui.test.SemanticsNodeInteraction.editableTextOrNull(): String? =
+    fetchSemanticsNode().config
+        .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.EditableText)
+        ?.text
 
 private fun <T> androidx.compose.ui.semantics.SemanticsConfiguration.getOrNull(
     key: androidx.compose.ui.semantics.SemanticsPropertyKey<T>,

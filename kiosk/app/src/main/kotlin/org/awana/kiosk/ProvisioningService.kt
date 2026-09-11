@@ -35,9 +35,18 @@ class ProvisioningService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val provisioner = Provisioner(applicationContext)
         val serverUrl = intent?.getStringExtra(EXTRA_SERVER_URL)
         val configSha256 = intent?.getStringExtra(EXTRA_CONFIG_SHA256)
-        if (serverUrl == null || configSha256 == null) {
+        // No extras is the launcher's "set this phone up again": the bootstrap
+        // from the attempt that failed is the only one this device will ever
+        // get, short of a factory reset and another scan.
+        val bootstrap = if (serverUrl != null && configSha256 != null) {
+            ProvisioningBootstrap(serverUrl, configSha256)
+        } else {
+            provisioner.pendingBootstrap()
+        }
+        if (bootstrap == null) {
             Log.e(TAG, "Started without a usable bootstrap")
             stopSelf(startId)
             return START_NOT_STICKY
@@ -46,8 +55,6 @@ class ProvisioningService : Service() {
         startForeground()
 
         scope.launch {
-            val provisioner = Provisioner(applicationContext)
-            val bootstrap = ProvisioningBootstrap(serverUrl, configSha256)
             val staged = File(cacheDir, CONFIG_FILE)
             val config = ConfigFetch.fetch(bootstrap, staged).getOrElse { error ->
                 // The config never arrived or did not match its hash, so there
@@ -56,6 +63,7 @@ class ProvisioningService : Service() {
                 Log.e(TAG, "Could not obtain the deployment config", error)
                 provisioner.recordBootstrapFailure(
                     error.message ?: getString(R.string.provisioning_config_failed),
+                    bootstrap,
                 )
                 launchHome()
                 stopSelf(startId)

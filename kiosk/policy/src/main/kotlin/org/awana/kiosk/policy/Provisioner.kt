@@ -4,6 +4,7 @@ import org.awana.kiosk.shared.KioskConfig
 import org.awana.kiosk.shared.DeviceLabel
 import org.awana.kiosk.shared.EnrolmentReport
 import org.awana.kiosk.shared.Certificates
+import org.awana.kiosk.shared.ProvisioningBootstrap
 import android.content.Context
 import android.util.Log
 import java.io.File
@@ -38,6 +39,7 @@ class Provisioner(
 
     suspend fun provision(config: KioskConfig): ProvisionResult {
         configStore.save(config)
+        clearPendingBootstrap()
 
         val before = policy.applyBeforeInstall(config)
         val installFailures = if (config.serverUrl != null) installPayload(config) else emptyList()
@@ -113,11 +115,28 @@ class Provisioner(
      * Records a failure that happened before there was any config to apply.
      *
      * There is no server URL that can be trusted to report to at this point, so
-     * this only writes locally, where the admin screen shows it. Without it the
-     * device would sit on an empty launcher with no explanation.
+     * this only writes locally, where the launcher and the admin screen show
+     * it. Without it the device would sit on an empty launcher with no
+     * explanation.
+     *
+     * [bootstrap] is kept beside the report because it only ever arrives once,
+     * through the setup wizard: without it "set this phone up again" has
+     * nowhere to go but a factory reset.
      */
-    fun recordBootstrapFailure(reason: String) {
+    fun recordBootstrapFailure(reason: String, bootstrap: ProvisioningBootstrap? = null) {
         saveLastReport(buildReport(config = null, failures = listOf(reason)))
+        bootstrap?.let { File(appContext.filesDir, PENDING_BOOTSTRAP).writeText(it.encode()) }
+    }
+
+    /** The bootstrap of an attempt that never reached a config, for a retry. */
+    fun pendingBootstrap(): ProvisioningBootstrap? {
+        val file = File(appContext.filesDir, PENDING_BOOTSTRAP)
+        if (!file.exists()) return null
+        return runCatching { ProvisioningBootstrap.parse(file.readText()) }.getOrNull()
+    }
+
+    fun clearPendingBootstrap() {
+        File(appContext.filesDir, PENDING_BOOTSTRAP).delete()
     }
 
     fun lastReport(): EnrolmentReport? {
@@ -148,5 +167,6 @@ class Provisioner(
     private companion object {
         const val TAG = "Provisioner"
         const val LAST_REPORT = "last-report.json"
+        const val PENDING_BOOTSTRAP = "pending-bootstrap.json"
     }
 }

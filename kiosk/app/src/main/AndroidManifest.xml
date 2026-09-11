@@ -61,7 +61,13 @@
         <service
             android:name=".ProvisioningService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="dataSync">
+            <!-- Lets the launcher's "set this phone up again" reach the service
+                 without the launcher module depending on this one. -->
+            <intent-filter>
+                <action android:name="org.awana.kiosk.action.SET_UP_AGAIN" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".KioskDeviceAdminReceiver"

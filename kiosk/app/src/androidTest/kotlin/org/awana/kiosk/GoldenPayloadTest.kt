@@ -68,7 +68,7 @@ class GoldenPayloadTest {
         // came back into the QR, the code would grow with every app again.
         val payload = golden()
         assertTrue(!payload.contains("adminPinHash"))
-        assertTrue(!payload.contains("visibleInLauncher"))
+        assertTrue(!payload.contains("launcher"))
     }
 
     @Test

@@ -19,6 +19,9 @@ rootProject.name = "field-kiosk"
 // The wire protocol between the two apps: config, report, PIN hash, certificates.
 include(":shared")
 
+// The generated colour scheme both apps paint themselves with.
+include(":design")
+
 // The Device Owner app installed on every field device.
 include(":kiosk:app")
 include(":kiosk:policy")

@@ -4,6 +4,8 @@ import org.awana.kiosk.shared.KioskConfig
 import org.awana.kiosk.shared.PackageSpec
 import org.awana.kiosk.shared.WifiNetwork
 import org.awana.kiosk.shared.AdminPin
+import org.awana.kiosk.shared.LauncherEntry
+import org.awana.kiosk.shared.LauncherRole
 
 /**
  * Synthesised configs for driving `Provisioner.provision` directly, which is
@@ -29,7 +31,9 @@ object TestConfigs {
         adminPinHash = AdminPin.hash(PIN),
         serverUrl = null,
         packages = packages,
-        visibleInLauncher = visible,
+        launcher = visible.mapIndexed { index, packageName ->
+            LauncherEntry(packageName, if (index == 0) LauncherRole.HERO else LauncherRole.SMALL)
+        },
         wifiNetworks = wifiNetworks,
         showNotificationShade = showNotificationShade,
         locale = "en",
