@@ -4,6 +4,9 @@ import android.content.Context
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -111,12 +114,45 @@ class ScreenshotTest {
      * `onRoot` cannot pick between the two.
      */
     private fun write(name: String) {
-        compose.waitForIdle()
-        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        val bitmap = capture(name)
         val dir = File(context.filesDir, "screenshots").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
         }
+    }
+
+    /**
+     * `waitForIdle` returns once compose has settled, which is not once the
+     * window has been drawn — `takeScreenshot` otherwise catches it before its
+     * first frame and writes a blank screen. Which screens lose that race
+     * varies from run to run, so retry until something is on it.
+     */
+    private fun capture(name: String): Bitmap {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        compose.waitForIdle()
+        var bitmap = automation.takeScreenshot().readable()
+        var attempts = 1
+        while (bitmap.isBlank() && attempts < 20) {
+            Thread.sleep(100)
+            compose.waitForIdle()
+            bitmap = automation.takeScreenshot().readable()
+            attempts++
+        }
+        check(!bitmap.isBlank()) { "nothing was ever drawn on $name" }
+        return bitmap
+    }
+
+    private fun Bitmap.readable(): Bitmap =
+        if (config == Bitmap.Config.HARDWARE) copy(Bitmap.Config.ARGB_8888, false) else this
+
+    /** One flat colour between the status bar and the navigation bar. */
+    private fun Bitmap.isBlank(): Boolean {
+        val top = height / 8
+        val first = getPixel(width / 2, top)
+        for (y in top until height * 7 / 8 step 8) {
+            for (x in 0 until width step 8) if (getPixel(x, y) != first) return false
+        }
+        return true
     }
 
     private fun home(state: HomeState) = @Composable {
@@ -234,5 +270,26 @@ class ScreenshotTest {
         compose.onNodeWithTag(TAG_ROW_UNPROVISION).performClick()
         compose.waitForIdle()
         write("kiosk-15-remove-lock")
+    }
+
+    /** A listed app, whatever this device happens to have on it. */
+    private val anApp = SemanticsMatcher("a launchable app") {
+        it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("test-app-") == true
+    }
+
+    @Test
+    fun setUpForTesting() {
+        compose.setContent { KioskTheme { TestSetupScreen(onDone = {}, onCancel = {}) } }
+        // `produceState` reads the package manager off the main thread, so the
+        // list arrives after the screen does.
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(anApp).fetchSemanticsNodes().size >= 2
+        }
+        // Two chosen, so the screenshot shows both roles and an enabled button.
+        compose.onAllNodes(anApp)[0].performClick()
+        compose.onAllNodes(anApp)[1].performClick()
+        // Let the press ripple finish; `waitForIdle` does not wait for it.
+        Thread.sleep(500)
+        write("kiosk-16-test-setup")
     }
 }
