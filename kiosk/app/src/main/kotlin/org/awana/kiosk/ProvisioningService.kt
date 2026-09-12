@@ -13,6 +13,10 @@ import android.os.IBinder
 import android.util.Log
 import org.awana.kiosk.policy.ConfigFetch
 import org.awana.kiosk.policy.DevicePolicy
+import org.awana.kiosk.policy.Provisioning
+import org.awana.kiosk.policy.UpdateProgress
+import org.awana.kiosk.policy.UpdateState
+import org.awana.kiosk.policy.Updates
 import org.awana.kiosk.policy.Provisioner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +39,11 @@ class ProvisioningService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == Provisioning.ACTION_APPLY_UPDATE) {
+            applyStagedUpdate(startId)
+            return START_NOT_STICKY
+        }
+
         val provisioner = Provisioner(applicationContext)
         val serverUrl = intent?.getStringExtra(EXTRA_SERVER_URL)
         val configSha256 = intent?.getStringExtra(EXTRA_CONFIG_SHA256)
@@ -85,6 +94,44 @@ class ProvisioningService : Service() {
             stopSelf(startId)
         }
         return START_NOT_STICKY
+    }
+
+    /**
+     * The admin screen has already joined the trainer's hotspot, fetched the
+     * config and had it verified against the hash on the code, so there is
+     * nothing left to trust here — only to apply, which is the part that takes
+     * long enough to need a service.
+     *
+     * No `launchHome()` at the end: the trainer is watching the admin screen,
+     * and throwing them back to the home screen would hide the result.
+     */
+    private fun applyStagedUpdate(startId: Int) {
+        val config = Updates.stagedConfig(applicationContext)
+        if (config == null) {
+            Log.e(TAG, "Asked to apply an update with nothing staged")
+            UpdateProgress.report(UpdateState.Failed(getString(R.string.update_nothing_staged)))
+            stopSelf(startId)
+            return
+        }
+
+        startForeground()
+        scope.launch {
+            val outcome = runCatching {
+                Provisioner(applicationContext).provision(config) { UpdateProgress.report(it) }
+            }
+            // Before the result is published, so the phone is back on its own
+            // Wi-Fi by the time anyone reads "up to date" and walks away.
+            Updates.finish(applicationContext)
+            outcome
+                .onSuccess { UpdateProgress.report(UpdateState.Done(it.report)) }
+                .onFailure {
+                    Log.e(TAG, "The update threw", it)
+                    UpdateProgress.report(
+                        UpdateState.Failed(it.message ?: getString(R.string.update_failed)),
+                    )
+                }
+            stopSelf(startId)
+        }
     }
 
     override fun onDestroy() {

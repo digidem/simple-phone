@@ -22,6 +22,12 @@ data class EnrolmentReport(
     val buildVariant: String,
     val isDeviceOwner: Boolean,
     val installed: List<InstalledPackage> = emptyList(),
+    /**
+     * What happened to each app this time round. Empty on reports from before
+     * updating existed, so a trainer's app must not read it as "nothing
+     * happened".
+     */
+    val packageOutcomes: List<PackageOutcome> = emptyList(),
     val policiesApplied: List<String> = emptyList(),
     val failures: List<String> = emptyList(),
     val permissionFailures: List<String> = emptyList(),
@@ -38,6 +44,32 @@ data class EnrolmentReport(
     companion object {
         fun parse(text: String): EnrolmentReport = KioskJson.pretty.decodeFromString(serializer(), text)
     }
+}
+
+@Serializable
+data class PackageOutcome(
+    val packageName: String,
+    val result: InstallResult,
+    val versionName: String? = null,
+)
+
+/**
+ * Why this exists: a trainer running an update session needs to tell a phone
+ * that took the new build from one that already had it, and both look
+ * identical in [EnrolmentReport.installed].
+ */
+@Serializable
+enum class InstallResult {
+    /** The app was not on the phone before. */
+    Installed,
+
+    /** An older version was replaced. */
+    Updated,
+
+    /** The phone already had this version, so nothing was downloaded. */
+    AlreadyCurrent,
+
+    Failed,
 }
 
 @Serializable

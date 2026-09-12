@@ -24,11 +24,20 @@ object ConfigFetch {
     private const val ATTEMPTS = 4
     private const val FIRST_BACKOFF_MS = 1_000L
 
-    suspend fun fetch(bootstrap: ProvisioningBootstrap, into: File): Result<KioskConfig> {
+    /**
+     * [attempts] is raised by the update path: enrolment arrives already on the
+     * trainer's hotspot, but a phone in the field has just been told to join it
+     * and association can take longer than the default backoff allows.
+     */
+    suspend fun fetch(
+        bootstrap: ProvisioningBootstrap,
+        into: File,
+        attempts: Int = ATTEMPTS,
+    ): Result<KioskConfig> {
         val url = bootstrap.serverUrl + KioskConfig.CONFIG_PATH
 
         var lastError: Throwable? = null
-        repeat(ATTEMPTS) { attempt ->
+        repeat(attempts) { attempt ->
             if (attempt > 0) delay(FIRST_BACKOFF_MS shl (attempt - 1))
 
             // Downloaded to a file and hashed from disk so the bytes that are

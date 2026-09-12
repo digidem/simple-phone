@@ -15,6 +15,7 @@ androidxTestCore = "1.7.0"
 androidxTestRunner = "1.7.0"
 androidxTestRules = "1.7.0"
 uiautomator = "2.3.0"
+camerax = "1.5.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -35,8 +36,17 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 # it too, standing in for the provision app's server.
 nanohttpd = { module = "org.nanohttpd:nanohttpd", version.ref = "nanohttpd" }
 # core only: the android-integration artifact pulls in a camera scanner this
-# app has no use for. Bitmaps are rendered from the BitMatrix directly.
+# app has no use for. The provision app renders bitmaps from the BitMatrix
+# directly; the kiosk decodes frames CameraX hands it.
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+
+# The kiosk reads the same provisioning code from the admin screen to update a
+# phone already in service. Not ML Kit: it needs Play Services, and these are
+# AOSP budget phones.
+androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
 androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestJunit" }

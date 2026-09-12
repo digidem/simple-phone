@@ -9,6 +9,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.awana.kiosk.shared.EnrolmentCode
 import org.junit.Test
 import java.io.File
 import org.awana.kiosk.shared.LauncherEntry
@@ -218,5 +219,30 @@ class QrPayloadTest {
             configSha256 = configHash(fixedConfig()),
         )
         assertTrue(huge.toByteArray().size > QrPayload.COMFORTABLE_BYTES)
+    }
+
+    /**
+     * The admin screen reads this same code to update a phone already in
+     * service, so the builder and that parser must not drift apart.
+     */
+    @Test
+    fun `the kiosk can read back what this builds`() {
+        val payload = QrPayload.build(
+            serverUrl = "http://192.168.43.1:8080/",
+            signatureChecksum = EnrolmentCode.checksumOf("aa".repeat(32)),
+            wifiSsid = "Awana-Setup",
+            wifiPassphrase = "correcthorsebattery",
+            wifiSecurityType = "WPA",
+            locale = "pt_BR",
+            timeZone = "America/Manaus",
+            configSha256 = "AABBCC",
+        )
+
+        val code = EnrolmentCode.parse(payload)!!
+        assertEquals("http://192.168.43.1:8080", code.bootstrap.serverUrl)
+        assertEquals("aabbcc", code.bootstrap.configSha256)
+        assertEquals("Awana-Setup", code.wifi.ssid)
+        assertEquals("correcthorsebattery", code.wifi.passphrase)
+        assertTrue(code.signedBySameKeyAs(listOf("aa".repeat(32))))
     }
 }

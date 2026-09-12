@@ -25,6 +25,11 @@ import org.awana.kiosk.shared.LauncherRole
 import org.awana.kiosk.shared.PackageSpec
 import org.awana.kiosk.shared.ProvisioningBootstrap
 import org.junit.After
+import androidx.compose.ui.res.stringResource
+import org.awana.kiosk.shared.EnrolmentReport
+import org.awana.kiosk.shared.InstallResult
+import org.awana.kiosk.shared.InstalledPackage
+import org.awana.kiosk.shared.PackageOutcome
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Rule
@@ -275,6 +280,52 @@ class ScreenshotTest {
     /** A listed app, whatever this device happens to have on it. */
     private val anApp = SemanticsMatcher("a launchable app") {
         it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("test-app-") == true
+    }
+
+    // --- updating a phone already in service --------------------------------
+
+    private fun updateReport(vararg outcomes: Pair<String, InstallResult>) = EnrolmentReport(
+        deviceId = "device",
+        deviceLabel = "AB23",
+        deploymentId = "rio-negro",
+        deploymentName = "Rio Negro",
+        manufacturer = "Xiaomi",
+        model = "Redmi 12C",
+        androidVersion = "13",
+        apiLevel = 33,
+        kioskVersion = "0.1.0 (1)",
+        buildVariant = "sig:8766564a",
+        isDeviceOwner = true,
+        installed = outcomes.map { InstalledPackage(it.first, "2.0.002") },
+        packageOutcomes = outcomes.map { PackageOutcome(it.first, it.second, "2.0.002") },
+        reportedAtEpochMs = 0L,
+    )
+
+    /**
+     * No viewfinder here: a test cannot point a camera at a code, and the
+     * screen this device would render instead says the camera is unavailable,
+     * which would misrepresent the feature rather than document it.
+     */
+    @Test
+    fun updateInProgress() = shoot("kiosk-17-update-working") {
+        UpdateWorking(stringResource(R.string.update_installing, "CoMapeo", 2, 4), onBack = null)
+    }
+
+    @Test
+    fun updateFinished() = shoot("kiosk-18-update-done") {
+        UpdateFinished(
+            report = updateReport(
+                "org.awana.comapeo" to InstallResult.Updated,
+                "org.telegram.messenger" to InstallResult.AlreadyCurrent,
+                "com.android.camera2" to InstallResult.AlreadyCurrent,
+            ),
+            onBack = {},
+        )
+    }
+
+    @Test
+    fun updateRefused() = shoot("kiosk-19-update-refused") {
+        UpdateRefused(stringResource(R.string.update_other_fleet), onBack = {})
     }
 
     @Test

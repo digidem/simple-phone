@@ -107,4 +107,33 @@
     <string name="install_url_explain">The device must be connected to a network for this. The app you install must be signed with the same key as the one recorded for it, or it will be refused.</string>
     <string name="install_url_label">Web address of the APK file</string>
     <string name="install_package_label">App package name (for example org.example.app)</string>
+    <!-- Updating a phone that is already in service -->
+    <string name="admin_update">Update this phone</string>
+    <string name="admin_update_body">New apps and settings from the trainer\'s phone</string>
+    <string name="scan_title">Scan the code</string>
+    <string name="scan_help">Point the camera at the code on the trainer\'s phone.</string>
+    <string name="scan_not_our_code">That is not a Field Kiosk code. Keep looking for the one on the trainer\'s phone.</string>
+    <string name="scan_no_camera">This phone will not let Field Kiosk use the camera, so the code cannot be scanned.</string>
+    <string name="update_joining">Joining the trainer\'s Wi-Fi…</string>
+    <string name="update_fetching">Getting the settings…</string>
+    <string name="update_installing">Installing %1$s (%2$d of %3$d)…</string>
+    <string name="update_applying">Applying the settings…</string>
+    <string name="update_hold_on">Keep this phone near the trainer\'s phone until it finishes.</string>
+    <string name="update_done">This phone is up to date</string>
+    <string name="update_done_nothing">Nothing needed changing. This phone was already up to date.</string>
+    <string name="update_could_not_start">This phone could not start the update. Set it up again from the trainer\'s phone.</string>
+    <string name="update_problem">The update did not finish</string>
+    <string name="update_other_fleet">This code is from a different Field Kiosk than the one on this phone, so it was refused.</string>
+    <string name="update_move_title">Move this phone?</string>
+    <string name="update_move_body">This code is for %1$s. This phone is set up for %2$s. Its apps and settings will be replaced.</string>
+    <string name="update_move_confirm">Move it</string>
+    <string name="action_close">Close</string>
+    <plurals name="update_result_updated">
+        <item quantity="one">%d app updated</item>
+        <item quantity="other">%d apps updated</item>
+    </plurals>
+    <plurals name="update_result_current">
+        <item quantity="one">%d app was already up to date</item>
+        <item quantity="other">%d apps were already up to date</item>
+    </plurals>
 </resources>

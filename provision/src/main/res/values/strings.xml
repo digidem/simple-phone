@@ -25,7 +25,7 @@
     <string name="deployments_title">Deployments</string>
     <string name="deployments_empty">No deployments yet. Create one to get started.</string>
     <string name="deployments_new">New deployment</string>
-    <string name="deployment_start">Start setting up devices</string>
+    <string name="deployment_start">Set up and update phones</string>
     <string name="deployment_name">Name of this deployment</string>
     <string name="deployment_pin">Admin PIN for these devices</string>
     <string name="deployment_pin_help">Trainers use this PIN to unlock the settings screen on a device. Write it down: it cannot be read back from here.</string>
@@ -124,10 +124,13 @@
     <string name="apk_fingerprint_hint">A phone refuses any file whose fingerprint does not match the one recorded when the deployment was made.</string>
     <string name="apps_added">Added %1$s.</string>
 
-    <string name="session_title">Setting up devices</string>
+    <string name="session_title">Phones on this deployment</string>
     <string name="session_step_1"><![CDATA[Take the new phone out of the box, or <b>factory reset</b> it if it has been used before.]]></string>
     <string name="session_step_2"><![CDATA[Turn it on. On the very first <b>Hello</b> screen, tap the middle of the screen <b>six times</b>.]]></string>
     <string name="session_step_3">A camera opens by itself. Point it at the code above and hold steady.</string>
+    <!-- The same code updates a phone that is already in service; see EnrolmentCode. -->
+    <string name="session_already_set_up_title">A phone you already set up</string>
+    <string name="session_already_set_up"><![CDATA[Hold the <b>top-left corner</b>, enter the admin PIN, tap <b>Update this phone</b>, and scan the same code.]]></string>
     <string name="session_requires_android9">The phone must be freshly reset, and running Android 11 or newer.</string>
     <string name="session_waiting">Waiting for the first device…</string>
 
@@ -190,4 +193,8 @@
     <string name="help_step6">6. When it finishes, the phone shows the kiosk home screen and appears in the list here.</string>
     <string name="help_wifi">Before you start, disconnect this phone from any Wi-Fi network. If it stays joined to one, the code can send the new phones to the wrong address and they will wait forever.</string>
     <string name="help_power">Bring a power bank. Running the hotspot and sending the apps drains this phone quickly — that, rather than speed, is what limits how many phones you can do in one go.</string>
+    <string name="phone_app_installed">Newly installed</string>
+    <string name="phone_app_updated">Updated</string>
+    <string name="phone_app_already_current">Already up to date</string>
+    <string name="phone_app_failed">Did not install</string>
 </resources>

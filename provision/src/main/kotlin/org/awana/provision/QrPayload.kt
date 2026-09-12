@@ -9,6 +9,7 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.awana.kiosk.shared.EnrolmentCode
 import org.awana.kiosk.shared.KioskConfig
 import org.awana.kiosk.shared.KioskJson
 
@@ -28,7 +29,7 @@ import org.awana.kiosk.shared.KioskJson
  */
 object QrPayload {
 
-    const val DPC_PACKAGE = "org.awana.kiosk"
+    const val DPC_PACKAGE = EnrolmentCode.DPC_PACKAGE
     const val DPC_RECEIVER = "org.awana.kiosk.KioskDeviceAdminReceiver"
 
     /**

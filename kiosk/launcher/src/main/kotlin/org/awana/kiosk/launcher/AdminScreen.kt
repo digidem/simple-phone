@@ -60,7 +60,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class Page { Menu, About, Change, Wrong, VisibleApps, ChangePin, Wifi, InstallUrl }
+private enum class Page { Menu, About, Change, Update, Wrong, VisibleApps, ChangePin, Wifi, InstallUrl }
 
 /**
  * Three doors behind the PIN: what this phone is, what can be changed about it,
@@ -84,6 +84,7 @@ fun AdminScreen(onDone: () -> Unit) {
 
             Page.About -> AboutPage(onBack = { page = Page.Menu })
             Page.Change -> ChangePage(onNavigate = { page = it }, onBack = { page = Page.Menu })
+            Page.Update -> UpdateScreen(onBack = { page = Page.Menu })
             Page.Wrong -> SomethingWrongPage(onNavigate = { page = it }, onDone = onDone, onBack = { page = Page.Menu })
             Page.VisibleApps -> VisibleAppsPage(onBack = { page = Page.Change })
             Page.ChangePin -> ChangePinPage(onBack = { page = Page.Change })
@@ -116,6 +117,14 @@ private fun AdminMenu(onNavigate: (Page) -> Unit, onDone: () -> Unit) {
                 body = R.string.admin_change_body,
                 tag = TAG_ROW_CHANGE,
             ) { onNavigate(Page.Change) }
+        }
+        item {
+            Door(
+                icon = R.drawable.ic_door_update,
+                title = R.string.admin_update,
+                body = R.string.admin_update_body,
+                tag = TAG_ROW_UPDATE,
+            ) { onNavigate(Page.Update) }
         }
         item {
             Door(
@@ -445,7 +454,7 @@ private fun AboutPage(onBack: () -> Unit) {
 }
 
 @Composable
-private fun Verdict(healthy: Boolean, headline: String, body: String) {
+internal fun Verdict(healthy: Boolean, headline: String, body: String) {
     Surface(
         color = if (healthy) {
             MaterialTheme.okColors.container
@@ -752,6 +761,7 @@ const val TAG_VERDICT_OK = "admin-verdict-ok"
 const val TAG_VERDICT_PROBLEM = "admin-verdict-problem"
 const val TAG_ROW_ABOUT = "admin-row-about"
 const val TAG_ROW_CHANGE = "admin-row-change"
+const val TAG_ROW_UPDATE = "admin-row-update"
 const val TAG_ROW_WRONG = "admin-row-wrong"
 const val TAG_ROW_VISIBLE_APPS = "admin-row-visible-apps"
 const val TAG_ROW_CHANGE_PIN = "admin-row-change-pin"

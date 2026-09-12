@@ -15,6 +15,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import org.awana.kiosk.shared.InstallResult
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -154,8 +155,12 @@ fun PhoneDetailScreen(
 
             item { SectionHeader(stringResource(R.string.phone_apps_installed)) }
             items(report.installed, key = { it.packageName }) {
+                // Empty on reports from before updating existed, which is why
+                // the version is still what the row leads with.
+                val outcome = report.packageOutcomes.firstOrNull { o -> o.packageName == it.packageName }
                 ListItem(
                     headlineContent = { Text(expected[it.packageName] ?: it.packageName) },
+                    supportingContent = outcome?.let { o -> { Text(stringResource(o.result.label())) } },
                     trailingContent = { Text(it.versionName.orEmpty()) },
                 )
             }
@@ -251,3 +256,15 @@ private fun keyOf(phone: Phone): String = when (phone) {
 const val TAG_PHONES = "phones"
 const val TAG_PHONE_DETAIL = "phone-detail"
 const val TAG_BACK = "back"
+
+/**
+ * A phone that took the new build and one that already had it look identical
+ * in the installed list, and on an update session that is the difference a
+ * trainer is looking for.
+ */
+private fun InstallResult.label() = when (this) {
+    InstallResult.Installed -> R.string.phone_app_installed
+    InstallResult.Updated -> R.string.phone_app_updated
+    InstallResult.AlreadyCurrent -> R.string.phone_app_already_current
+    InstallResult.Failed -> R.string.phone_app_failed
+}

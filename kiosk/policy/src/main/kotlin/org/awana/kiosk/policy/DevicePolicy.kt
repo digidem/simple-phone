@@ -218,6 +218,23 @@ class DevicePolicy(context: Context) {
      * Android 10 requires location permission even for a Device Owner. The
      * admin screen shows that list; nothing here uses location for anything.
      */
+    /**
+     * Grants this app one of its own permissions, if it can.
+     *
+     * Used for the camera the moment before the scanner opens rather than at
+     * provisioning time, so phones already in the field get it without being
+     * set up again. False on a phone where this app is not the device owner,
+     * which is the debug-only local setup.
+     */
+    fun grantSelf(permission: String): Boolean = runCatching {
+        dpm.setPermissionGrantState(
+            admin,
+            appContext.packageName,
+            permission,
+            DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED,
+        )
+    }.getOrDefault(false)
+
     fun applyOwnPermissions() {
         val granted = dpm.setPermissionGrantState(
             admin,

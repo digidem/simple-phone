@@ -25,6 +25,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -332,6 +333,18 @@ private fun Steps() {
             Step(1, R.string.session_step_1)
             Step(2, R.string.session_step_2, figure = true)
             Step(3, R.string.session_step_3)
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+            Text(
+                text = stringResource(R.string.session_already_set_up_title),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = AnnotatedString.fromHtml(stringResource(R.string.session_already_set_up)),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }

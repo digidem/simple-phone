@@ -127,6 +127,27 @@ ANDROID_SERIAL=$SERIAL ./gradlew :kiosk:app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=org.awana.kiosk.PolicyTest#provisionIsIdempotent
 ```
 
+### `UnprovisionTest` ends the device owner, and the run
+
+`UnprovisionTest` removes the lock, which clears Device Owner — that is the
+thing it exists to prove. Every Device-Owner test ordered after it then skips
+its `assumeTrue(isDeviceOwner)`, and a run reports **BUILD SUCCESSFUL with
+thirty-odd tests silently skipped**. The count in Gradle's output is the tell:
+`(32 skipped)` is not a pass.
+
+Set the owner again before the next run, and to check a change against the
+policy suite, exclude it:
+
+```sh
+SERIAL=$(tools/test.sh --serial kiosk_aosp_30)
+adb -s "$SERIAL" shell dpm set-device-owner \
+  org.awana.kiosk/org.awana.kiosk.KioskDeviceAdminReceiver
+adb -s "$SERIAL" shell am instrument -w \
+  -e package org.awana.kiosk -e notPackage org.awana.kiosk.launcher \
+  -e notClass org.awana.kiosk.UnprovisionTest \
+  org.awana.kiosk.test/androidx.test.runner.AndroidJUnitRunner
+```
+
 ### Reading instrumented failures
 
 Gradle prints only a pass/fail count for a connected run. The messages are in
@@ -182,6 +203,34 @@ few collaborators directly. The maintaining team works in React Native, not
 Kotlin. Prefer boring code; every dependency is a maintenance liability.
 
 ## Things that look like bugs but are deliberate
+
+**Updating a phone reuses the enrolment QR rather than a code of its own.** The
+setup wizard reads it on a factory-fresh phone and the admin screen reads the
+same one on a phone already in service, so a trainer holds up one code for a
+room containing both and cannot pick the wrong one. It also means the
+deployment name in the "move this phone" question comes out of hash-verified
+bytes rather than out of the code, and that the code carries
+`PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM` — which `EnrolmentCode` compares
+with the phone's own certificate. A config carries `adminPinHash`, so without
+that check a debug session could change a production phone's PIN. See
+`Updates.prepare`.
+
+**A package is skipped only when its version *and* its signature match.** An
+app of the right version signed by someone else is not the deployment's app,
+and calling it up to date would be a false all-clear on the one thing the
+fingerprint exists for. `Provisioner.alreadyCurrent` checks both; the mismatch
+case still downloads, so the installer can refuse it with a message naming both
+keys.
+
+**The networks disabled to reach the trainer are written to a file, not held in
+memory.** `enableNetwork(id, true)` disables every other saved network, so a
+phone whose process died mid-update would be left unable to rejoin its own
+deployment's Wi-Fi — worse than the problem it came for. `Updates.finish` reads
+that file back, and the service calls it before publishing the result.
+
+**The camera is granted at the scanner, not at provisioning.** Otherwise phones
+already in the field would have to be set up again before they could be
+updated, which is the thing updating exists to avoid.
 
 **`DISALLOW_FACTORY_RESET`, `DISALLOW_DEBUGGING_FEATURES` and
 `DISALLOW_INSTALL_UNKNOWN_SOURCES` are not set.** They are listed in

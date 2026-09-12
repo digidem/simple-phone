@@ -4,6 +4,10 @@ import org.awana.kiosk.shared.KioskConfig
 import org.awana.kiosk.shared.DeviceLabel
 import org.awana.kiosk.shared.EnrolmentReport
 import org.awana.kiosk.shared.Certificates
+import org.awana.kiosk.shared.InstallResult
+import org.awana.kiosk.shared.InstalledPackage
+import org.awana.kiosk.shared.PackageOutcome
+import org.awana.kiosk.shared.PackageSpec
 import org.awana.kiosk.shared.ProvisioningBootstrap
 import android.content.Context
 import android.util.Log
@@ -37,19 +41,29 @@ class Provisioner(
     private val appContext = context.applicationContext
     private val configStore = ConfigStore(appContext)
 
-    suspend fun provision(config: KioskConfig): ProvisionResult {
+    /**
+     * [onStep] lets the admin screen show what is happening. It is optional
+     * because the enrolment path has the setup wizard's own progress in front
+     * of it, and because every test drives this without a screen.
+     */
+    suspend fun provision(
+        config: KioskConfig,
+        onStep: (UpdateState) -> Unit = {},
+    ): ProvisionResult {
         configStore.save(config)
         clearPendingBootstrap()
 
         val before = policy.applyBeforeInstall(config)
-        val installFailures = if (config.serverUrl != null) installPayload(config) else emptyList()
+        val payload = if (config.serverUrl != null) installPayload(config, onStep) else Payload()
+        onStep(UpdateState.ApplyingSettings)
         val after = policy.applyAfterInstall(config)
 
         val report = buildReport(
             config,
             applied = before.applied + after.applied,
-            failures = before.failures + installFailures + after.failures,
+            failures = before.failures + payload.failures + after.failures,
             permissionFailures = after.permissionFailures,
+            packageOutcomes = payload.outcomes,
         )
         saveLastReport(report)
 
@@ -57,30 +71,82 @@ class Provisioner(
         return ProvisionResult(report, delivered)
     }
 
-    private suspend fun installPayload(config: KioskConfig): List<String> {
+    private class Payload(
+        val failures: MutableList<String> = mutableListOf(),
+        val outcomes: MutableList<PackageOutcome> = mutableListOf(),
+    )
+
+    private suspend fun installPayload(config: KioskConfig, onStep: (UpdateState) -> Unit): Payload {
         val serverUrl = config.serverUrl!!.trimEnd('/')
         val staging = File(appContext.cacheDir, "staging").apply { mkdirs() }
-        val failures = mutableListOf<String>()
+        val payload = Payload()
 
-        for (spec in config.packages) {
+        config.packages.forEachIndexed { index, spec ->
+            val had = DeviceFacts.installedPackage(appContext, spec.packageName)
+            onStep(UpdateState.Installing(spec.packageName, index + 1, config.packages.size))
+            if (alreadyCurrent(spec, had)) {
+                Log.i(TAG, "${spec.packageName} is already at ${had?.versionCode}")
+                payload.outcomes += PackageOutcome(
+                    spec.packageName,
+                    InstallResult.AlreadyCurrent,
+                    had?.versionName,
+                )
+                return@forEachIndexed
+            }
+
             val apk = File(staging, "${spec.packageName}.apk")
             try {
                 val url = serverUrl + spec.path
                 val downloaded = Http.download(url, apk)
                 if (downloaded.isFailure) {
-                    failures += "Could not download ${spec.packageName} from $url: " +
+                    payload.failures += "Could not download ${spec.packageName} from $url: " +
                         "${downloaded.exceptionOrNull()?.message}"
-                    continue
+                    payload.outcomes += PackageOutcome(spec.packageName, InstallResult.Failed)
+                    return@forEachIndexed
                 }
                 when (val outcome = installer.install(apk, spec.packageName, spec.certSha256)) {
-                    is InstallOutcome.Success -> Log.i(TAG, "Installed ${spec.packageName}")
-                    is InstallOutcome.Failure -> failures += outcome.reason
+                    is InstallOutcome.Success -> {
+                        Log.i(TAG, "Installed ${spec.packageName}")
+                        payload.outcomes += PackageOutcome(
+                            spec.packageName,
+                            if (had == null) InstallResult.Installed else InstallResult.Updated,
+                            DeviceFacts.installedPackage(appContext, spec.packageName)?.versionName,
+                        )
+                    }
+
+                    is InstallOutcome.Failure -> {
+                        payload.failures += outcome.reason
+                        payload.outcomes += PackageOutcome(spec.packageName, InstallResult.Failed)
+                    }
                 }
             } finally {
                 apk.delete()
             }
         }
-        return failures
+        return payload
+    }
+
+    /**
+     * Whether what is on the phone already satisfies [spec], so the download
+     * can be skipped.
+     *
+     * An update session re-serves the whole deployment, and one app can be
+     * ~90 MB. Over a single hotspot to a room full of phones, fetching what is
+     * already installed is the difference between minutes and an afternoon.
+     *
+     * The signature is part of the question and not only the version: an app of
+     * the right version signed by someone else must never be reported as
+     * current. Left to the installer, which refuses it with a message naming
+     * both keys — after the download, but correctness first.
+     */
+    private fun alreadyCurrent(spec: PackageSpec, installed: InstalledPackage?): Boolean {
+        val wanted = spec.versionCode ?: return false
+        if ((installed?.versionCode ?: return false) < wanted) return false
+        if (spec.certSha256.isBlank()) return true
+        return Certificates.matches(
+            Certificates.ofInstalledPackage(appContext, spec.packageName),
+            spec.certSha256,
+        )
     }
 
     /** [config] is null only before there was one to apply; see [recordBootstrapFailure]. */
@@ -89,6 +155,7 @@ class Provisioner(
         applied: List<String> = emptyList(),
         failures: List<String> = emptyList(),
         permissionFailures: List<String> = emptyList(),
+        packageOutcomes: List<PackageOutcome> = emptyList(),
     ) = EnrolmentReport(
         deviceId = DeviceFacts.deviceId(appContext),
         deviceLabel = DeviceLabel.of(DeviceFacts.deviceId(appContext)),
@@ -104,6 +171,7 @@ class Provisioner(
         installed = config?.packages.orEmpty().mapNotNull {
             DeviceFacts.installedPackage(appContext, it.packageName)
         },
+        packageOutcomes = packageOutcomes,
         policiesApplied = applied,
         failures = failures,
         permissionFailures = permissionFailures,

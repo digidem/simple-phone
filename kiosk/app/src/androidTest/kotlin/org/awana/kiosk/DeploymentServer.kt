@@ -18,6 +18,9 @@ class DeploymentServer(private val apk: File) : NanoHTTPD(0) {
 
     val reports = mutableListOf<EnrolmentReport>()
 
+    /** Every path a device asked for, so a test can assert what it did *not* fetch. */
+    val fetched = mutableListOf<String>()
+
     var config: String? = null
 
     val url: String get() = "http://127.0.0.1:$listeningPort"
@@ -29,6 +32,11 @@ class DeploymentServer(private val apk: File) : NanoHTTPD(0) {
     }
 
     override fun serve(session: IHTTPSession): Response = when {
+        session.method == Method.GET -> { fetched += session.uri; get(session) }
+        else -> post(session)
+    }
+
+    private fun post(session: IHTTPSession): Response = when {
         session.method == Method.POST && session.uri == "/report" -> {
             val body = HashMap<String, String>()
             session.parseBody(body)
@@ -36,6 +44,10 @@ class DeploymentServer(private val apk: File) : NanoHTTPD(0) {
             newFixedLengthResponse("ok")
         }
 
+        else -> newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "no")
+    }
+
+    private fun get(session: IHTTPSession): Response = when {
         session.uri == KioskConfig.CONFIG_PATH && config != null ->
             newFixedLengthResponse(Response.Status.OK, "application/json", config)
 

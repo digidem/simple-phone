@@ -9,6 +9,12 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <!-- Reading saved Wi-Fi networks needs this from Android 10; the kiosk grants it to itself at provisioning. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Reading the trainer's provisioning code to update a phone already in
+         service. Granted by the kiosk to itself the moment before the scanner
+         opens, since under lock task a permission dialog is one more thing that
+         can go wrong in front of someone who cannot read it. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
@@ -66,6 +72,9 @@
                  without the launcher module depending on this one. -->
             <intent-filter>
                 <action android:name="org.awana.kiosk.action.SET_UP_AGAIN" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="org.awana.kiosk.action.APPLY_UPDATE" />
             </intent-filter>
         </service>
 

@@ -66,6 +66,58 @@ class WifiAdmin(context: Context) {
         return true
     }
 
+    /**
+     * Joins [ssid] now, leaving whatever the phone is currently on.
+     *
+     * Returns the networks that were enabled beforehand, for [reEnable].
+     * `enableNetwork(id, true)` disables every other saved network, and a phone
+     * left in that state would never rejoin its own deployment's Wi-Fi once the
+     * trainer's hotspot is switched off — which would be a worse problem than
+     * the one the update solved.
+     */
+    @Suppress("DEPRECATION")
+    fun joinNow(ssid: String, passphrase: String?): List<Int> {
+        val enabledBefore = try {
+            wifi.configuredNetworks.orEmpty()
+                .filter { it.status != WifiConfiguration.Status.DISABLED }
+                .map { it.networkId }
+        } catch (e: SecurityException) {
+            // Without location permission the list comes back empty rather than
+            // wrong; nothing to restore is better than restoring the wrong set.
+            emptyList()
+        }
+
+        val existing = try {
+            wifi.configuredNetworks.orEmpty().firstOrNull { it.SSID?.trim('"') == ssid }?.networkId
+        } catch (e: SecurityException) {
+            null
+        }
+
+        val networkId = existing ?: WifiConfiguration().apply {
+            SSID = "\"$ssid\""
+            if (passphrase.isNullOrEmpty()) {
+                allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE)
+            } else {
+                preSharedKey = "\"$passphrase\""
+                allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK)
+            }
+        }.let { wifi.addNetwork(it) }
+
+        if (networkId == -1) {
+            Log.w(TAG, "addNetwork refused for $ssid")
+            return emptyList()
+        }
+        wifi.enableNetwork(networkId, true)
+        wifi.reconnect()
+        return enabledBefore.filterNot { it == networkId }
+    }
+
+    /** Puts back what [joinNow] disabled. Safe to call with an empty list. */
+    @Suppress("DEPRECATION")
+    fun reEnable(networkIds: List<Int>) {
+        networkIds.forEach { runCatching { wifi.enableNetwork(it, false) } }
+    }
+
     private companion object {
         const val TAG = "WifiAdmin"
     }

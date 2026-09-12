@@ -2,6 +2,7 @@ package org.awana.kiosk
 
 import org.awana.kiosk.shared.PackageSpec
 import org.awana.kiosk.shared.Certificates
+import org.awana.kiosk.shared.InstallResult
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -167,5 +168,76 @@ class EndToEndProvisioningTest {
         assertTrue(flushed > 0)
         assertEquals(0, reporter.queuedCount())
         assertTrue(reports().isNotEmpty())
+    }
+
+    // --- second pass ---------------------------------------------------------
+
+    private fun installedVersionCode() =
+        context.packageManager.getPackageInfo(SamplePayload.PACKAGE, 0).longVersionCode
+
+    private fun spec(versionCode: Long?, cert: String = sampleFingerprint()) = listOf(
+        PackageSpec(SamplePayload.PACKAGE, cert, SamplePayload.PATH, versionCode = versionCode),
+    )
+
+    /**
+     * An update session re-serves the whole deployment to every phone in the
+     * room over one hotspot, so not re-fetching what is already installed is
+     * the difference between minutes and an afternoon.
+     */
+    @Test
+    fun anAppThePhoneAlreadyHasIsNotDownloadedAgain() = runBlocking {
+        val url = startServer()
+        Provisioner(context).provision(TestConfigs.withServer(url, samplePackages()))
+        assumeTrue(SamplePayload.isInstalled(context))
+        server!!.fetched.clear()
+
+        val result = Provisioner(context)
+            .provision(TestConfigs.withServer(url, spec(installedVersionCode())))
+
+        assertTrue(
+            "an app already on the phone was downloaded again: ${server!!.fetched}",
+            server!!.fetched.none { it.startsWith("/apks/") },
+        )
+        assertEquals(
+            InstallResult.AlreadyCurrent,
+            result.report.packageOutcomes.single().result,
+        )
+    }
+
+    @Test
+    fun aNewerVersionIsFetchedAndReportedAsAnUpdate() = runBlocking {
+        val url = startServer()
+        Provisioner(context).provision(TestConfigs.withServer(url, samplePackages()))
+        assumeTrue(SamplePayload.isInstalled(context))
+        server!!.fetched.clear()
+
+        val result = Provisioner(context)
+            .provision(TestConfigs.withServer(url, spec(installedVersionCode() + 1)))
+
+        assertTrue(server!!.fetched.any { it.startsWith("/apks/") })
+        assertEquals(InstallResult.Updated, result.report.packageOutcomes.single().result)
+    }
+
+    /**
+     * The version alone must not decide it. An app of the right version signed
+     * by someone else is not the deployment's app, and reporting it as current
+     * would be a false all-clear on the one thing the fingerprint exists for.
+     */
+    @Test
+    fun aRightVersionSignedByTheWrongKeyIsNotTakenAsCurrent() = runBlocking {
+        val url = startServer()
+        Provisioner(context).provision(TestConfigs.withServer(url, samplePackages()))
+        assumeTrue(SamplePayload.isInstalled(context))
+        server!!.fetched.clear()
+
+        val result = Provisioner(context).provision(
+            TestConfigs.withServer(url, spec(installedVersionCode(), cert = "0".repeat(64))),
+        )
+
+        assertTrue(
+            "the phone skipped an app whose signature it had not checked",
+            server!!.fetched.any { it.startsWith("/apks/") },
+        )
+        assertTrue(result.report.failures.single().contains("signed with a different key"))
     }
 }
