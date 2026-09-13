@@ -7,6 +7,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -141,5 +143,28 @@ class UpdateScreenTest {
 
         compose.onNodeWithText(refusal).assertIsDisplayed()
         compose.onNodeWithTag(TAG_UPDATE_CLOSE).assertIsDisplayed()
+    }
+
+    /**
+     * The escape hatch from curating settings one feature request at a time.
+     * It sits behind the same PIN that can remove the lock altogether, so it
+     * widens no blast radius that was not already open.
+     */
+    @Test
+    fun theChangePageOffersThePhonesOwnSettings() {
+        compose.setContent { KioskTheme { AdminScreen(onDone = {}) } }
+        compose.onNodeWithTag(TAG_ROW_CHANGE).performClick()
+
+        compose.onNodeWithTag(TAG_ROW_SETTINGS).performScrollTo().assertIsDisplayed()
+    }
+
+    /** Opening it unlocks the phone, so it says so before it does. */
+    @Test
+    fun openingSettingsExplainsTheUnlockFirst() {
+        compose.setContent { KioskTheme { AdminScreen(onDone = {}) } }
+        compose.onNodeWithTag(TAG_ROW_CHANGE).performClick()
+        compose.onNodeWithTag(TAG_ROW_SETTINGS).performScrollTo().performClick()
+
+        compose.onNodeWithText(context.getString(R.string.admin_settings_explain)).assertIsDisplayed()
     }
 }

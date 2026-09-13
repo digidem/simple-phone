@@ -4,6 +4,9 @@ import org.awana.kiosk.shared.DeviceLabel
 import org.awana.kiosk.shared.KioskConfig
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -212,6 +215,9 @@ private fun Door(
 
 @Composable
 private fun ChangePage(onNavigate: (Page) -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
+    var confirmSettings by remember { mutableStateOf(false) }
+
     AdminPage(stringResource(R.string.admin_change), onBack, TAG_ADMIN_CHANGE) {
         item {
             AdminDoor(R.string.admin_visible_apps, R.string.admin_visible_apps_body, TAG_ROW_VISIBLE_APPS) {
@@ -228,7 +234,44 @@ private fun ChangePage(onNavigate: (Page) -> Unit, onBack: () -> Unit) {
                 onNavigate(Page.ChangePin)
             }
         }
+        // Everything else on this page is one curated setting. This is the
+        // escape hatch from curating them one feature request at a time — the
+        // phone's own settings, behind the same PIN that can remove the lock
+        // altogether, and put back by `LockTaskBreakService` when the break ends.
+        item {
+            AdminDoor(R.string.admin_settings, R.string.admin_settings_body, TAG_ROW_SETTINGS) {
+                confirmSettings = true
+            }
+        }
     }
+
+    if (confirmSettings) {
+        Confirm(
+            title = stringResource(R.string.admin_settings),
+            body = stringResource(R.string.admin_settings_explain),
+            confirmLabel = stringResource(R.string.admin_settings_open),
+            onConfirm = {
+                confirmSettings = false
+                openPhoneSettings(context)
+            },
+            onDismiss = { confirmSettings = false },
+        )
+    }
+}
+
+/**
+ * Settings is not in the lock task allowlist, so it cannot be foregrounded
+ * while the lock holds. The existing timed break is what makes it reachable,
+ * and what guarantees the phone locks itself again afterwards.
+ */
+private fun openPhoneSettings(context: Context) {
+    (context as? Activity)?.stopLockTask()
+    LockTaskBreakService.start(context)
+    runCatching {
+        context.startActivity(
+            Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.onFailure { Log.w("AdminScreen", "This phone has no settings activity", it) }
 }
 
 /**
@@ -764,6 +807,7 @@ const val TAG_ROW_CHANGE = "admin-row-change"
 const val TAG_ROW_UPDATE = "admin-row-update"
 const val TAG_ROW_WRONG = "admin-row-wrong"
 const val TAG_ROW_VISIBLE_APPS = "admin-row-visible-apps"
+const val TAG_ROW_SETTINGS = "admin-row-settings"
 const val TAG_ROW_CHANGE_PIN = "admin-row-change-pin"
 const val TAG_ROW_WIFI = "admin-row-wifi"
 const val TAG_ROW_REAPPLY = "admin-row-reapply"

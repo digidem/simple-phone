@@ -47,8 +47,28 @@ class LockTaskBreakService : Service() {
         return START_NOT_STICKY
     }
 
+    /**
+     * Puts back the two things a trip into the phone's settings can actually
+     * change, then returns home.
+     *
+     * Not `applyAll`: user restrictions, the lock task allowlist and its
+     * features are set by the device owner and cannot be cleared from settings
+     * at all, so re-applying them buys nothing — and this runs on the main
+     * thread from `onFinish`, where a dozen synchronous policy calls are a
+     * stall right at the moment the launcher is trying to come back.
+     */
+    private fun restoreWhatSettingsCanChange() {
+        val config = ConfigStore(this).load() ?: return
+        val policy = DevicePolicy(this)
+        runCatching { policy.applyScreen(config) }
+            .onFailure { Log.w(TAG, "Could not put the screen timeout back", it) }
+        runCatching { policy.applyHome() }
+            .onFailure { Log.w(TAG, "Could not put the home app back", it) }
+    }
+
     private fun relock() {
         timer?.cancel()
+        restoreWhatSettingsCanChange()
         val home = DevicePolicy.launcherComponent(this)
         if (home == null) {
             Log.e(TAG, "No launcher to return to")

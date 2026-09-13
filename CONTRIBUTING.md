@@ -148,6 +148,43 @@ adb -s "$SERIAL" shell am instrument -w \
   org.awana.kiosk.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
+### `LockTaskTest` gets flakier the longer the emulator has been up
+
+On a freshly booted `kiosk_aosp_30` it passes repeatedly. After a dozen or so
+lock-task cycles it starts failing one test per run, and a *different* one each
+time — `recentsIsNotReachable`, `batteryAndSignalStayVisible`,
+`quickSettingsCannotBeReachedWithTheShadeOff` have all been seen. Measured on
+one emulator, an unmodified worktree failed three runs out of four in exactly
+the same pattern as the branch under test.
+
+So never compare a branch against `main` by running one after the other — the
+second one is measured on a more degraded device and looks worse. Interleave
+the runs, or reboot the emulator between them. A single failure here is
+evidence of nothing; a *consistent* failure of the *same* test is.
+
+### `ProvisioningServiceTest` can crash the whole run
+
+`aConfigThatDoesNotMatchItsHashProvisionsNothingAndSaysWhy` sometimes takes the
+instrumentation process down instead of failing, with a framework NPE raised
+inside `system_server`:
+
+```
+java.lang.NullPointerException: Attempt to invoke virtual method
+  'ActivityRecord ActivityStack.getTopNonFinishingActivity()' on a null object reference
+  at org.awana.kiosk.ProvisioningService.launchHome
+```
+
+A crash aborts every test after it, so the run reports far fewer tests than it
+should. The same NPE also surfaces as an ordinary failure of
+`LockTaskTest.aTimedBreakLocksTheDeviceAgainWhenItExpires` in whole-suite runs,
+where the relock fires the HOME intent — same call, same null stack. Neither is
+ours: both reproduce on commits predating the code under review, on a freshly
+booted emulator, with an unmodified worktree — check that before believing a
+change caused it. It is state-dependent in a way that has not
+been pinned down: the same class passes inside a full-suite run and crashes on
+its own after a boot. Exclude it with `-e notClass` while bisecting something
+else.
+
 ### Reading instrumented failures
 
 Gradle prints only a pass/fail count for a connected run. The messages are in
@@ -227,6 +264,22 @@ memory.** `enableNetwork(id, true)` disables every other saved network, so a
 phone whose process died mid-update would be left unable to rejoin its own
 deployment's Wi-Fi — worse than the problem it came for. `Updates.finish` reads
 that file back, and the service calls it before publishing the result.
+
+**The admin screen opens the phone's own settings rather than curating them
+one at a time.** Brightness, sound, language — each would otherwise be a
+string, a control, a test and a translation, always lagging what a trainer
+needs in the field. It widens no blast radius: "Remove the lock" already sits
+behind the same PIN, so a PIN good enough to unprovision the phone is good
+enough to open Settings. Settings is not in the lock task allowlist, so it is
+reached through the existing ten-minute break, and `LockTaskBreakService` puts
+back the screen timeout and the home app when the break ends. Only those two:
+user restrictions, the lock task allowlist and its features are set by the
+device owner and cannot be cleared from settings at all, and `relock` runs on
+the main thread from `onFinish`, where a full `applyAll` would be a dozen
+synchronous policy calls stalling the launcher's return. The residual hazard
+is OEM Settings rather than AOSP Settings: on a cheap phone it often carries a
+battery manager or "phone manager" that force-stops apps, which is what
+`hostileOem` in the enrolment report is watching for.
 
 **The camera is granted at the scanner, not at provisioning.** Otherwise phones
 already in the field would have to be set up again before they could be
