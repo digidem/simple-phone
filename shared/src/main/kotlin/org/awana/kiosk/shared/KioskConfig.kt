@@ -39,6 +39,17 @@ data class KioskConfig(
     val showNotificationShade: Boolean = false,
     val locale: String = "en",
     val screenOffTimeoutMs: Long = 120_000,
+    /**
+     * Whether the phone keeps its own lock screen.
+     *
+     * Off by default: with no password set, Android still shows a swipe screen,
+     * and that is a barrier for a user who cannot read it. On, the keyguard is
+     * left alone and `LOCK_TASK_FEATURE_KEYGUARD` goes in — without that flag
+     * lock task suppresses the keyguard and a PIN set in settings would simply
+     * never be asked for. It is also the only thing covering the window between
+     * boot and the launcher taking the lock.
+     */
+    val screenLock: Boolean = false,
 ) {
     /** Entries whose package this config also installs, in launcher order. */
     val launcherEntries: List<LauncherEntry>

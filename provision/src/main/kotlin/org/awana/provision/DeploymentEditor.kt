@@ -85,6 +85,7 @@ fun DeploymentEditor(
     var locale by remember { mutableStateOf(profile.locale) }
     var timeZone by remember { mutableStateOf(profile.timeZone) }
     var shade by remember { mutableStateOf(profile.showNotificationShade) }
+    var screenLock by remember { mutableStateOf(profile.screenLock) }
     var screenOff by remember { mutableStateOf(profile.screenOffTimeoutMs) }
     var pickingTimeout by remember { mutableStateOf(false) }
     var networks by remember { mutableStateOf(profile.wifiNetworks) }
@@ -177,6 +178,7 @@ fun DeploymentEditor(
                                     locale = locale.trim(),
                                     timeZone = timeZone.trim(),
                                     showNotificationShade = shade,
+                                    screenLock = screenLock,
                                     screenOffTimeoutMs = screenOff,
                                     wifiNetworks = networks
                                         .map { it.copy(ssid = it.ssid.trim()) }
@@ -313,6 +315,26 @@ fun DeploymentEditor(
                 modifier = Modifier
                     .clickableRow { shadeScreen = true }
                     .testTag(TAG_EDITOR_SHADE),
+            )
+
+            // A switch, not a screen: unlike the shade there is one consequence
+            // and it fits on the row.
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.screen_lock_title)) },
+                supportingContent = {
+                    Text(
+                        stringResource(
+                            if (screenLock) R.string.screen_lock_on_body
+                            else R.string.screen_lock_off_body,
+                        ),
+                    )
+                },
+                trailingContent = {
+                    Switch(checked = screenLock, onCheckedChange = { screenLock = it })
+                },
+                modifier = Modifier
+                    .clickableRow { screenLock = !screenLock }
+                    .testTag(TAG_EDITOR_SCREEN_LOCK),
             )
 
             SectionHeader(stringResource(R.string.deployment_wifi))
@@ -744,6 +766,7 @@ private fun List<WifiNetwork>.replacing(index: Int, network: WifiNetwork): List<
 const val TAG_EDITOR = "deployment-editor"
 const val TAG_EDITOR_NAME = "deployment-name"
 const val TAG_EDITOR_PIN = "deployment-pin"
+const val TAG_EDITOR_SCREEN_LOCK = "editor-screen-lock"
 const val TAG_EDITOR_SHADE = "deployment-shade"
 const val TAG_EDITOR_TIMEOUT = "deployment-timeout"
 const val TAG_EDITOR_ADD_APP = "deployment-add-app"

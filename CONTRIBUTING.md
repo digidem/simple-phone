@@ -271,15 +271,31 @@ string, a control, a test and a translation, always lagging what a trainer
 needs in the field. It widens no blast radius: "Remove the lock" already sits
 behind the same PIN, so a PIN good enough to unprovision the phone is good
 enough to open Settings. Settings is not in the lock task allowlist, so it is
-reached through the existing ten-minute break, and `LockTaskBreakService` puts
-back the screen timeout and the home app when the break ends. Only those two:
-user restrictions, the lock task allowlist and its features are set by the
-device owner and cannot be cleared from settings at all, and `relock` runs on
-the main thread from `onFinish`, where a full `applyAll` would be a dozen
-synchronous policy calls stalling the launcher's return. The residual hazard
+**on the lock task allowlist**, so it opens *inside* the lock: the phone stays
+confined the whole time, which is tighter than dropping the lock to reach it.
+Nothing offers it to the user — the launcher lists only the deployment's apps,
+so only the admin door can start it. The residual hazard
 is OEM Settings rather than AOSP Settings: on a cheap phone it often carries a
 battery manager or "phone manager" that force-stops apps, which is what
 `hostileOem` in the enrolment report is watching for.
+
+**A deployment can ask for the phone's own lock screen, and it takes two
+changes rather than one.** `screenLock` stops the kiosk disabling the keyguard
+*and* adds `LOCK_TASK_FEATURE_KEYGUARD` — without that flag lock task suppresses
+the keyguard, so a PIN set in settings would never be asked for. It is off by
+default because with no password set Android still shows a swipe screen, which
+is a barrier for a user who cannot read it. It is also the only thing covering
+the window between switching on and the launcher taking the lock: user
+restrictions, the allowlist and the persistent HOME preference all survive a
+reboot without the app running, but lock task engagement does not.
+
+**`LauncherActivity.onResume` takes the lock back.** `lockTaskMode="if_whitelisted"`
+only fires when the activity *starts*, and the launcher is `singleInstance`, so
+a resume after a crash gets no such call. It is skipped while
+`LockTaskBreakService.running`, or returning home during a break would cut short
+the ten minutes a trainer asked for, and skipped unless this package is actually
+on the allowlist — `startLockTask` from a package that is not asks the user to
+confirm screen pinning, which is worse than doing nothing.
 
 **The camera is granted at the scanner, not at provisioning.** Otherwise phones
 already in the field would have to be set up again before they could be

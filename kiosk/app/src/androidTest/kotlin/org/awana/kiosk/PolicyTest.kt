@@ -64,6 +64,47 @@ class PolicyTest {
         assertTrue(TestConfigs.APP_PACKAGE in allowed)
     }
 
+    /**
+     * The admin screen opens the phone's own settings rather than curating one
+     * control per feature request, and it opens them *inside* the lock. Nothing
+     * offers settings to the user: the launcher lists only the deployment apps.
+     */
+    @Test
+    fun settingsIsOnTheAllowlistSoItOpensInsideTheLock() = runBlocking {
+        Provisioner(context).provision(TestConfigs.policyOnly())
+
+        val settings = policy.settingsPackage()
+        assertTrue("no settings activity resolved on this device", settings != null)
+        assertTrue(
+            "settings missing from ${policy.lockTaskPackages()}",
+            settings in policy.lockTaskPackages(),
+        )
+    }
+
+    /**
+     * Without `LOCK_TASK_FEATURE_KEYGUARD` lock task suppresses the keyguard,
+     * so a PIN set in the phone's settings would never be asked for.
+     */
+    @Test
+    fun aDeploymentThatWantsALockScreenGetsTheKeyguardFeature() = runBlocking {
+        Provisioner(context).provision(TestConfigs.policyOnly(screenLock = true))
+
+        assertTrue(
+            policy.lockTaskFeatures() and DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD != 0,
+        )
+    }
+
+    @Test
+    fun withoutItTheKeyguardStaysOutOfTheWay() = runBlocking {
+        Provisioner(context).provision(TestConfigs.policyOnly(screenLock = false))
+
+        assertEquals(
+            "a swipe screen is a barrier for a user who cannot read it",
+            0,
+            policy.lockTaskFeatures() and DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD,
+        )
+    }
+
     @Test
     fun shadeIsOffByDefaultAndSystemInfoIsOn() = runBlocking {
         Provisioner(context).provision(TestConfigs.policyOnly(showNotificationShade = false))

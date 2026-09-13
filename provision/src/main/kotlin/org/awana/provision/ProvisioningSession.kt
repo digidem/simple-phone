@@ -158,6 +158,7 @@ class ProvisioningSession(context: Context) {
             launcher = profile.launcher.filter { it.packageName in profile.packages },
             wifiNetworks = profile.wifiNetworks,
             showNotificationShade = profile.showNotificationShade,
+            screenLock = profile.screenLock,
             locale = profile.locale,
             screenOffTimeoutMs = profile.screenOffTimeoutMs,
         )

@@ -53,8 +53,6 @@
     <string name="admin_visible_apps_body">Choose which of the installed apps appear</string>
     <string name="admin_settings">Phone settings</string>
     <string name="admin_settings_body">Brightness, sound, language and everything else Android has</string>
-    <string name="admin_settings_explain">This unlocks the phone for 10 minutes so you can reach its settings. It locks itself again afterwards, and puts back anything the deployment controls.</string>
-    <string name="admin_settings_open">Open settings</string>
     <string name="admin_change_pin">Change the admin PIN</string>
     <string name="admin_change_pin_body">The PIN that opens this screen</string>
     <string name="admin_wifi">Wi-Fi</string>

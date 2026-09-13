@@ -149,6 +149,10 @@ class UpdateScreenTest {
      * The escape hatch from curating settings one feature request at a time.
      * It sits behind the same PIN that can remove the lock altogether, so it
      * widens no blast radius that was not already open.
+     *
+     * Not clicked here: it launches the real settings app, which would leave it
+     * in the foreground for whatever runs next. That it opens inside the lock
+     * is `PolicyTest.settingsIsOnTheAllowlistSoItOpensInsideTheLock`.
      */
     @Test
     fun theChangePageOffersThePhonesOwnSettings() {
@@ -158,13 +162,4 @@ class UpdateScreenTest {
         compose.onNodeWithTag(TAG_ROW_SETTINGS).performScrollTo().assertIsDisplayed()
     }
 
-    /** Opening it unlocks the phone, so it says so before it does. */
-    @Test
-    fun openingSettingsExplainsTheUnlockFirst() {
-        compose.setContent { KioskTheme { AdminScreen(onDone = {}) } }
-        compose.onNodeWithTag(TAG_ROW_CHANGE).performClick()
-        compose.onNodeWithTag(TAG_ROW_SETTINGS).performScrollTo().performClick()
-
-        compose.onNodeWithText(context.getString(R.string.admin_settings_explain)).assertIsDisplayed()
-    }
 }

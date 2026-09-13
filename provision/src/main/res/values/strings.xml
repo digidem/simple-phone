@@ -197,4 +197,7 @@
     <string name="phone_app_updated">Updated</string>
     <string name="phone_app_already_current">Already up to date</string>
     <string name="phone_app_failed">Did not install</string>
+    <string name="screen_lock_title">Lock screen</string>
+    <string name="screen_lock_on_body">The phone keeps its own lock screen, so a PIN or pattern can be set on it. Also protects the phone between switching on and the launcher taking over.</string>
+    <string name="screen_lock_off_body">No lock screen. The phone wakes straight into the launcher, with nothing to swipe or read.</string>
 </resources>

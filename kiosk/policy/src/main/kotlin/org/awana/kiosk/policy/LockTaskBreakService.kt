@@ -31,6 +31,7 @@ class LockTaskBreakService : Service() {
         val durationMs = intent?.getLongExtra(EXTRA_DURATION_MS, DEFAULT_DURATION_MS)
             ?: DEFAULT_DURATION_MS
         remainingMs = durationMs
+        running = true
         startForeground(NOTIFICATION_ID, notification(remainingMs))
 
         timer?.cancel()
@@ -68,6 +69,7 @@ class LockTaskBreakService : Service() {
 
     private fun relock() {
         timer?.cancel()
+        running = false
         restoreWhatSettingsCanChange()
         val home = DevicePolicy.launcherComponent(this)
         if (home == null) {
@@ -86,6 +88,7 @@ class LockTaskBreakService : Service() {
 
     override fun onDestroy() {
         timer?.cancel()
+        running = false
         super.onDestroy()
     }
 
@@ -113,6 +116,16 @@ class LockTaskBreakService : Service() {
         private const val TAG = "LockTaskBreak"
         private const val CHANNEL = "lock-break"
         private const val NOTIFICATION_ID = 2
+        /**
+         * Whether a break is running, for the launcher's re-lock guard: coming
+         * back to the home screen during a break must not end it, or the break
+         * would be useless for the thing it exists for — letting an installer
+         * or an app's own flow finish.
+         */
+        @Volatile
+        var running: Boolean = false
+            private set
+
         private const val EXTRA_DURATION_MS = "duration"
 
         const val DEFAULT_DURATION_MS = 10 * 60_000L

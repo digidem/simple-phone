@@ -3,6 +3,7 @@ package org.awana.kiosk.shared
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /**
@@ -137,5 +138,31 @@ class KioskConfigTest {
 
         assertEquals(listOf("app.comapeo"), config.launcherEntries.map { it.packageName })
         assertTrue(config.smallEntries.isEmpty())
+    }
+
+    /**
+     * A v3 config written before the lock screen existed must still parse, and
+     * must keep the behaviour it was deployed with: no lock screen.
+     */
+    @Test
+    fun `a config with no screen lock field keeps the phone unlocked`() {
+        val json = """
+            {"schemaVersion":3,"deploymentId":"rio-negro","deploymentName":"Rio Negro",
+             "adminPinHash":"x","packages":[],"launcher":[]}
+        """.trimIndent()
+
+        assertFalse(KioskConfig.parse(json).screenLock)
+    }
+
+    @Test
+    fun `asking for a screen lock survives a round trip`() {
+        val config = KioskConfig(
+            deploymentId = "rio-negro",
+            deploymentName = "Rio Negro",
+            adminPinHash = "x",
+            screenLock = true,
+        )
+
+        assertTrue(KioskConfig.parse(KioskJson.pretty.encodeToString(KioskConfig.serializer(), config)).screenLock)
     }
 }

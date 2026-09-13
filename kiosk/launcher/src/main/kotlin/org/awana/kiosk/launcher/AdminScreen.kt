@@ -216,7 +216,6 @@ private fun Door(
 @Composable
 private fun ChangePage(onNavigate: (Page) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
-    var confirmSettings by remember { mutableStateOf(false) }
 
     AdminPage(stringResource(R.string.admin_change), onBack, TAG_ADMIN_CHANGE) {
         item {
@@ -240,33 +239,18 @@ private fun ChangePage(onNavigate: (Page) -> Unit, onBack: () -> Unit) {
         // altogether, and put back by `LockTaskBreakService` when the break ends.
         item {
             AdminDoor(R.string.admin_settings, R.string.admin_settings_body, TAG_ROW_SETTINGS) {
-                confirmSettings = true
+                openPhoneSettings(context)
             }
         }
-    }
-
-    if (confirmSettings) {
-        Confirm(
-            title = stringResource(R.string.admin_settings),
-            body = stringResource(R.string.admin_settings_explain),
-            confirmLabel = stringResource(R.string.admin_settings_open),
-            onConfirm = {
-                confirmSettings = false
-                openPhoneSettings(context)
-            },
-            onDismiss = { confirmSettings = false },
-        )
     }
 }
 
 /**
- * Settings is not in the lock task allowlist, so it cannot be foregrounded
- * while the lock holds. The existing timed break is what makes it reachable,
- * and what guarantees the phone locks itself again afterwards.
+ * Settings is on the lock task allowlist, so it opens *inside* the lock: the
+ * phone stays confined, and there is no window to close afterwards. Nothing
+ * offers it to the user — only this door does.
  */
 private fun openPhoneSettings(context: Context) {
-    (context as? Activity)?.stopLockTask()
-    LockTaskBreakService.start(context)
     runCatching {
         context.startActivity(
             Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

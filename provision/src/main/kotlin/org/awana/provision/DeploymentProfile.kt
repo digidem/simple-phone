@@ -37,6 +37,8 @@ data class DeploymentProfile(
      * separate documentation.
      */
     val showNotificationShade: Boolean = false,
+    /** See `KioskConfig.screenLock`. Off by default. */
+    val screenLock: Boolean = false,
     /** Networks every device joins at provisioning; see `KioskConfig.wifiNetworks`. */
     val wifiNetworks: List<WifiNetwork> = emptyList(),
 ) {

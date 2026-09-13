@@ -96,8 +96,15 @@ class DevicePolicy(context: Context) {
 
     fun applyLockTask(config: KioskConfig) {
         // The kiosk's own package must be present or the launcher itself cannot
-        // hold the lock.
-        val allowlist = (listOf(appContext.packageName) + config.packages.map { it.packageName })
+        // hold the lock. Settings is there so the admin screen can reach it
+        // *inside* lock task: the phone stays confined the whole time, which is
+        // tighter than dropping the lock to get at it. Nothing offers it to the
+        // user — the launcher lists only the deployment's apps.
+        val allowlist = (
+            listOf(appContext.packageName) +
+                listOfNotNull(settingsPackage()) +
+                config.packages.map { it.packageName }
+            )
             .distinct()
             .toTypedArray()
         dpm.setLockTaskPackages(admin, allowlist)
@@ -116,11 +123,24 @@ class DevicePolicy(context: Context) {
         if (config.showNotificationShade) {
             features = features or DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS
         }
-        // Deliberately absent: OVERVIEW, KEYGUARD, and
-        // BLOCK_ACTIVITY_START_IN_TASK — the last would break the system share
-        // sheet and the document picker.
+        // Without this, lock task suppresses the keyguard and a PIN set in the
+        // phone's settings is never asked for.
+        if (config.screenLock) {
+            features = features or DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD
+        }
+        // Deliberately absent: OVERVIEW and BLOCK_ACTIVITY_START_IN_TASK — the
+        // last would break the system share sheet and the document picker.
         return features
     }
+
+    /**
+     * Resolved rather than named: `com.android.settings` is right on AOSP and
+     * wrong on plenty of the budget phones this runs on.
+     */
+    fun settingsPackage(): String? = appContext.packageManager
+        .resolveActivity(Intent(Settings.ACTION_SETTINGS), 0)
+        ?.activityInfo
+        ?.packageName
 
     fun lockTaskPackages(): List<String> = dpm.getLockTaskPackages(admin).toList()
 
@@ -294,9 +314,9 @@ class DevicePolicy(context: Context) {
     // --- Screen --------------------------------------------------------------
 
     fun applyScreen(config: KioskConfig) {
-        // Only takes effect while no lockscreen password is set, which is the
-        // provisioned state.
-        dpm.setKeyguardDisabled(admin, true)
+        // Disabling only takes effect while no lockscreen password is set, so a
+        // PIN someone has actually set always wins over this.
+        dpm.setKeyguardDisabled(admin, !config.screenLock)
         dpm.setSystemSetting(
             admin,
             Settings.System.SCREEN_OFF_TIMEOUT,

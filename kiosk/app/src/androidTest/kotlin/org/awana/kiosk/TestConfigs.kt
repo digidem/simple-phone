@@ -25,6 +25,7 @@ object TestConfigs {
         packages: List<PackageSpec> = listOf(appSpec()),
         visible: List<String> = packages.map { it.packageName },
         wifiNetworks: List<WifiNetwork> = emptyList(),
+        screenLock: Boolean = false,
     ) = KioskConfig(
         deploymentId = "test-deployment",
         deploymentName = "Test Deployment",
@@ -35,6 +36,7 @@ object TestConfigs {
             LauncherEntry(packageName, if (index == 0) LauncherRole.HERO else LauncherRole.SMALL)
         },
         wifiNetworks = wifiNetworks,
+        screenLock = screenLock,
         showNotificationShade = showNotificationShade,
         locale = "en",
         screenOffTimeoutMs = 120_000,
