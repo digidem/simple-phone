@@ -50,6 +50,17 @@ data class KioskConfig(
      * boot and the launcher taking the lock.
      */
     val screenLock: Boolean = false,
+    /**
+     * Version of the kiosk the trainer's app is serving at [DPC_PATH].
+     *
+     * A phone updates itself when this is higher than what it is running. It
+     * travels in the config rather than the manifest because the config is the
+     * only thing the QR's hash covers — a kiosk update is the one install that
+     * cannot be undone, so what triggers it has to be beyond the network's
+     * reach. Null on configs from trainer builds that predate this, which means
+     * no self-update.
+     */
+    val kioskVersionCode: Long? = null,
 ) {
     /** Entries whose package this config also installs, in launcher order. */
     val launcherEntries: List<LauncherEntry>
@@ -81,6 +92,9 @@ data class KioskConfig(
 
         /** Path the config is served from, relative to the server URL. */
         const val CONFIG_PATH = "/config.json"
+
+        /** Where the trainer's app serves the kiosk APK; see [kioskVersionCode]. */
+        const val DPC_PATH = "/dpc.apk"
 
         fun parse(text: String): KioskConfig =
             KioskJson.pretty.decodeFromString(serializer(), text)

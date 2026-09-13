@@ -159,6 +159,7 @@ class ProvisioningSession(context: Context) {
             wifiNetworks = profile.wifiNetworks,
             showNotificationShade = profile.showNotificationShade,
             screenLock = profile.screenLock,
+            kioskVersionCode = kioskVersionCodeOf(appContext, kioskApk),
             locale = profile.locale,
             screenOffTimeoutMs = profile.screenOffTimeoutMs,
         )
@@ -277,7 +278,7 @@ class ProvisioningSession(context: Context) {
         const val PORT = 8080
         const val SOCKET_TIMEOUT_MS = 60_000
         const val KIOSK_APK = "kiosk.apk"
-        const val DPC_PATH = "/dpc.apk"
+        const val DPC_PATH = KioskConfig.DPC_PATH
         const val REPORT_PATH = "/report"
     }
 }
@@ -289,6 +290,17 @@ class ProvisioningSession(context: Context) {
  * Computed from the APK being served rather than hardcoded, so debug and release
  * builds both work and there is no constant to forget at release time.
  */
+/**
+ * The version of the kiosk this build bundles, read from the APK it will serve
+ * rather than from `BuildConfig`: the trainer's app and the kiosk it carries
+ * are versioned separately, and it is the served file that phones will get.
+ */
+private fun kioskVersionCodeOf(context: Context, apk: File): Long? = runCatching {
+    context.packageManager
+        .getPackageArchiveInfo(apk.absolutePath, 0)
+        ?.longVersionCode
+}.getOrNull()
+
 fun signatureChecksumOf(context: Context, apk: File): String {
     val fingerprint = Certificates.ofApkFile(context, apk).firstOrNull()
         ?: error("Could not read a signing certificate from the kiosk APK at ${apk.path}")

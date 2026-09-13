@@ -12,6 +12,8 @@ import org.awana.kiosk.shared.ProvisioningBootstrap
 import org.awana.kiosk.shared.WifiNetwork
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.awana.kiosk.policy.KioskUpdate
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -138,5 +140,52 @@ class UpdatesTest {
         assertTrue(!Updates.movesDeployment(current, same))
         // A phone that has never been set up is not being moved anywhere.
         assertTrue(!Updates.movesDeployment(null, other))
+    }
+
+    // --- the kiosk replacing itself -----------------------------------------
+
+    private fun installedKioskVersion() =
+        context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
+
+    private fun withKioskVersion(versionCode: Long?) =
+        TestConfigs.policyOnly(packages = emptyList()).copy(kioskVersionCode = versionCode)
+
+    /**
+     * Not actually installed here — committing it would replace the app the
+     * test is running in. What is worth pinning is the decision, because it is
+     * the one install that cannot be undone.
+     */
+    @Test
+    fun aNewerKioskOnTheTrainersPhoneIsOfferedToThisOne() {
+        assertTrue(
+            KioskUpdate.isAvailable(context, withKioskVersion(installedKioskVersion() + 1)),
+        )
+    }
+
+    @Test
+    fun theSameKioskIsNotReinstalledForNothing() {
+        assertFalse(KioskUpdate.isAvailable(context, withKioskVersion(installedKioskVersion())))
+    }
+
+    /** Every phone after the first would otherwise be killed mid-session. */
+    @Test
+    fun anOlderKioskOnTheTrainersPhoneIsIgnored() {
+        assertFalse(KioskUpdate.isAvailable(context, withKioskVersion(installedKioskVersion() - 1)))
+    }
+
+    /** Configs from trainer builds that predate this say nothing, and nothing happens. */
+    @Test
+    fun aConfigThatDoesNotMentionTheKioskLeavesItAlone() {
+        assertFalse(KioskUpdate.isAvailable(context, withKioskVersion(null)))
+    }
+
+    @Test
+    fun withNoServerThereIsNothingToFetchTheUpdateFrom() = runBlocking {
+        val refusal = KioskUpdate.apply(
+            context,
+            withKioskVersion(installedKioskVersion() + 1).copy(serverUrl = null),
+        )
+
+        assertTrue(refusal.orEmpty().contains("No server"))
     }
 }

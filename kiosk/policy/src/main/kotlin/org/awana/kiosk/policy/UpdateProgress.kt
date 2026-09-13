@@ -46,6 +46,12 @@ sealed interface UpdateState {
 
     data object ApplyingSettings : UpdateState
 
+    /**
+     * Replacing the kiosk itself. The last thing that happens, and the screen
+     * showing it goes away with the process as the install commits.
+     */
+    data object UpdatingKiosk : UpdateState
+
     data class Done(val report: EnrolmentReport) : UpdateState
 
     data class Failed(val reason: String) : UpdateState

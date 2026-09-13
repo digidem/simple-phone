@@ -297,6 +297,22 @@ the ten minutes a trainer asked for, and skipped unless this package is actually
 on the allowlist — `startLockTask` from a package that is not asks the user to
 confirm screen pinning, which is worse than doing nothing.
 
+**The kiosk replaces itself, last, and only on a strictly newer version.**
+Android lets a device owner be replaced by a package signed with the same key
+and a higher version code — verified on `kiosk_aosp_30`: version 1 to 2 in
+place, admin intact. Without it a bug in the kiosk means factory resetting
+every phone, since a device owner cannot be uninstalled. The version the
+trainer serves travels in the config, not the manifest, because the config is
+the only thing the QR's hash covers and this is the one install that cannot be
+undone. It runs after the payload, the policy, the report and the Wi-Fi
+restore: committing it kills the process, so anything left undone would stay
+undone. *Strictly* newer, because equal versions are the case on every phone
+after the first and reinstalling for nothing would kill the process each time.
+
+Going back down is not symmetrical: `adb install -r` refuses a downgrade over
+an installed device owner and there is no uninstall, so restoring an older
+build on a test device needs `adb install -r -d`.
+
 **The camera is granted at the scanner, not at provisioning.** Otherwise phones
 already in the field would have to be set up again before they could be
 updated, which is the thing updating exists to avoid.

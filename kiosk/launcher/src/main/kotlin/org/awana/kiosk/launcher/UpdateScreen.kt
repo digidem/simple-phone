@@ -159,6 +159,7 @@ private fun UpdateState.describe(): String = when (this) {
     UpdateState.FetchingSettings -> stringResource(R.string.update_fetching)
     is UpdateState.Installing -> stringResource(R.string.update_installing, packageName, at, of)
     UpdateState.ApplyingSettings, UpdateState.Idle -> stringResource(R.string.update_applying)
+    UpdateState.UpdatingKiosk -> stringResource(R.string.update_kiosk)
     is UpdateState.Done, is UpdateState.Failed -> ""
 }
 

@@ -17,6 +17,7 @@ import org.awana.kiosk.policy.Provisioning
 import org.awana.kiosk.policy.UpdateProgress
 import org.awana.kiosk.policy.UpdateState
 import org.awana.kiosk.policy.Updates
+import org.awana.kiosk.policy.KioskUpdate
 import org.awana.kiosk.policy.Provisioner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -119,11 +120,37 @@ class ProvisioningService : Service() {
             val outcome = runCatching {
                 Provisioner(applicationContext).provision(config) { UpdateProgress.report(it) }
             }
-            // Before the result is published, so the phone is back on its own
-            // Wi-Fi by the time anyone reads "up to date" and walks away.
+            // The phone goes back on its own Wi-Fi before anything else: it has
+            // to be true both by the time someone reads "up to date" and walks
+            // away, and before the kiosk update below kills this process.
             Updates.finish(applicationContext)
+
+            // Last, after the payload, the policy and the report. Committing
+            // this replaces the running app, so anything left undone here stays
+            // undone — and on success it does not return at all.
+            val kioskUpdate = outcome.getOrNull()
+                ?.takeIf { KioskUpdate.isAvailable(applicationContext, config) }
+                ?.let {
+                    UpdateProgress.report(UpdateState.UpdatingKiosk)
+                    KioskUpdate.apply(applicationContext, config)
+                }
+
             outcome
-                .onSuccess { UpdateProgress.report(UpdateState.Done(it.report)) }
+                .onSuccess { result ->
+                    UpdateProgress.report(
+                        if (kioskUpdate == null) {
+                            UpdateState.Done(result.report)
+                        } else {
+                            // The phone is updated; only replacing the kiosk
+                            // failed, and saying so beats a bare success.
+                            UpdateState.Done(
+                                result.report.copy(
+                                    failures = result.report.failures + kioskUpdate,
+                                ),
+                            )
+                        },
+                    )
+                }
                 .onFailure {
                     Log.e(TAG, "The update threw", it)
                     UpdateProgress.report(
