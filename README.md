@@ -1,5 +1,8 @@
 # Field Kiosk
 
+> [!WARNING]
+> **Proof-of-concept prototype.** This project is not yet ready for production use. Expect breaking changes, missing features and rough edges, and do not rely on it for real field deployments.
+
 Android Device Owner management for field deployments: setup Android phones locked down to specific apps and configurations.
 
 **Field Kiosk** turns an Android phone into a locked-down device: a home screen with a handful of apps on it, no quick-settings shade, nothing that can be uninstalled by accident, and no Google account or internet connection needed to set it up. It is an Android **Device Owner**, the strongest form of management the platform offers.
