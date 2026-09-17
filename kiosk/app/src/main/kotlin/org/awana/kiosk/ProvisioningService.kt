@@ -1,6 +1,8 @@
 package org.awana.kiosk
 
 import org.awana.kiosk.shared.ProvisioningBootstrap
+import org.awana.kiosk.shared.Telemetry
+import io.sentry.SentryLevel
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,7 +12,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import org.awana.kiosk.policy.ConfigFetch
 import org.awana.kiosk.policy.DevicePolicy
 import org.awana.kiosk.policy.Provisioning
@@ -39,6 +40,11 @@ class ProvisioningService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        Telemetry.init(this)
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == Provisioning.ACTION_APPLY_UPDATE) {
             applyStagedUpdate(startId)
@@ -48,19 +54,25 @@ class ProvisioningService : Service() {
         val provisioner = Provisioner(applicationContext)
         val serverUrl = intent?.getStringExtra(EXTRA_SERVER_URL)
         val configSha256 = intent?.getStringExtra(EXTRA_CONFIG_SHA256)
-        // No extras is the launcher's "set this phone up again": the bootstrap
-        // from the attempt that failed is the only one this device will ever
-        // get, short of a factory reset and another scan.
+        // No extras is the launcher's "set this phone up again", or a wizard
+        // that dropped the admin extras before the completion broadcast: the
+        // bootstrap kept earlier is the only one this device will ever get,
+        // short of a factory reset and another scan.
         val bootstrap = if (serverUrl != null && configSha256 != null) {
             ProvisioningBootstrap(serverUrl, configSha256)
         } else {
             provisioner.pendingBootstrap()
         }
         if (bootstrap == null) {
-            Log.e(TAG, "Started without a usable bootstrap")
+            Telemetry.report(TAG, "Started without a usable bootstrap", context = this)
             stopSelf(startId)
             return START_NOT_STICKY
         }
+        Telemetry.info(
+            TAG,
+            "Provisioning from ${bootstrap.serverUrl} " +
+                "(bootstrap ${if (serverUrl != null) "from the intent" else "kept earlier"})",
+        )
 
         startForeground()
 
@@ -70,12 +82,18 @@ class ProvisioningService : Service() {
                 // The config never arrived or did not match its hash, so there
                 // is nothing to apply and no server URL that can be trusted to
                 // report to. Recorded where the admin screen will show it.
-                Log.e(TAG, "Could not obtain the deployment config", error)
+                Telemetry.report(
+                    TAG,
+                    "Could not obtain the deployment config: ${error.message}",
+                    extras = mapOf("serverUrl" to bootstrap.serverUrl),
+                    context = this@ProvisioningService,
+                )
                 provisioner.recordBootstrapFailure(
                     error.message ?: getString(R.string.provisioning_config_failed),
                     bootstrap,
                 )
                 launchHome()
+                Telemetry.flush()
                 stopSelf(startId)
                 return@launch
             }
@@ -83,15 +101,26 @@ class ProvisioningService : Service() {
 
             runCatching { provisioner.provision(config) }
                 .onSuccess {
-                    Log.i(
+                    val failures = it.report.failures + it.report.permissionFailures
+                    Telemetry.report(
                         TAG,
-                        "Provisioning finished: ${it.report.failures.size} failure(s), " +
-                            "report delivered=${it.reportDelivered}",
+                        "Provisioning finished with ${failures.size} failure(s)",
+                        level = if (failures.isEmpty()) SentryLevel.INFO else SentryLevel.WARNING,
+                        extras = mapOf(
+                            "failures" to failures,
+                            "reportDelivered" to it.reportDelivered,
+                            "isDeviceOwner" to it.report.isDeviceOwner,
+                            "packages" to it.report.packageOutcomes,
+                        ),
+                        context = this@ProvisioningService,
                     )
                 }
-                .onFailure { Log.e(TAG, "Provisioning threw", it) }
+                .onFailure {
+                    Telemetry.report(TAG, "Provisioning threw", error = it, context = this@ProvisioningService)
+                }
 
             launchHome()
+            Telemetry.flush()
             stopSelf(startId)
         }
         return START_NOT_STICKY
@@ -109,7 +138,7 @@ class ProvisioningService : Service() {
     private fun applyStagedUpdate(startId: Int) {
         val config = Updates.stagedConfig(applicationContext)
         if (config == null) {
-            Log.e(TAG, "Asked to apply an update with nothing staged")
+            Telemetry.report(TAG, "Asked to apply an update with nothing staged")
             UpdateProgress.report(UpdateState.Failed(getString(R.string.update_nothing_staged)))
             stopSelf(startId)
             return
@@ -137,6 +166,15 @@ class ProvisioningService : Service() {
 
             outcome
                 .onSuccess { result ->
+                    val failures = result.report.failures + listOfNotNull(kioskUpdate)
+                    if (failures.isNotEmpty()) {
+                        Telemetry.report(
+                            TAG,
+                            "Update finished with ${failures.size} failure(s)",
+                            level = SentryLevel.WARNING,
+                            extras = mapOf("failures" to failures),
+                        )
+                    }
                     UpdateProgress.report(
                         if (kioskUpdate == null) {
                             UpdateState.Done(result.report)
@@ -152,11 +190,12 @@ class ProvisioningService : Service() {
                     )
                 }
                 .onFailure {
-                    Log.e(TAG, "The update threw", it)
+                    Telemetry.report(TAG, "The update threw", error = it, context = this@ProvisioningService)
                     UpdateProgress.report(
                         UpdateState.Failed(it.message ?: getString(R.string.update_failed)),
                     )
                 }
+            Telemetry.flush()
             stopSelf(startId)
         }
     }
@@ -173,13 +212,21 @@ class ProvisioningService : Service() {
      * task without any further call.
      */
     private fun launchHome() {
-        val home = DevicePolicy.launcherComponent(this) ?: return
-        startActivity(
-            Intent(Intent.ACTION_MAIN)
-                .addCategory(Intent.CATEGORY_HOME)
-                .setComponent(home)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
+        val home = DevicePolicy.launcherComponent(this)
+        if (home == null) {
+            Telemetry.warn(TAG, "No launcher component to open")
+            return
+        }
+        try {
+            startActivity(
+                Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_HOME)
+                    .setComponent(home)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        } catch (e: Exception) {
+            Telemetry.report(TAG, "Could not open the launcher", error = e)
+        }
     }
 
     private fun startForeground() {
@@ -209,10 +256,13 @@ class ProvisioningService : Service() {
         private const val EXTRA_CONFIG_SHA256 = "configSha256"
         private const val CONFIG_FILE = "deployment-config.json"
 
-        fun start(context: Context, bootstrap: ProvisioningBootstrap) {
+        /** A null [bootstrap] runs the one [Provisioner.pendingBootstrap] kept. */
+        fun start(context: Context, bootstrap: ProvisioningBootstrap?) {
             val intent = Intent(context, ProvisioningService::class.java)
-                .putExtra(EXTRA_SERVER_URL, bootstrap.serverUrl)
-                .putExtra(EXTRA_CONFIG_SHA256, bootstrap.configSha256)
+            bootstrap?.let {
+                intent.putExtra(EXTRA_SERVER_URL, it.serverUrl)
+                    .putExtra(EXTRA_CONFIG_SHA256, it.configSha256)
+            }
             context.startForegroundService(intent)
         }
     }

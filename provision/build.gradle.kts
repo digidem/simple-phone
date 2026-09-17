@@ -24,6 +24,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["sentryDsn"] = providers.gradleProperty("sentryDsn").getOrElse("")
     }
 
     signingConfigs {
@@ -91,8 +92,8 @@ evaluationDependsOn(":kiosk:app")
 
 /**
  * Bundles the kiosk APK of the same build type into this app's assets, where
- * the provisioning server serves it from /dpc.apk. Debug provision builds
- * carry a debug kiosk and provision a debug fleet, which can never receive
+ * the provisioning server serves it from /dpc.apk. A debug trainer's app
+ * carries a debug kiosk and provisions a debug fleet, which can never receive
  * production updates; see KEYS.md.
  */
 listOf("debug", "release").forEach { variant ->

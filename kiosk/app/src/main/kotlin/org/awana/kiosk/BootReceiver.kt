@@ -7,6 +7,7 @@ import android.util.Log
 import org.awana.kiosk.policy.ConfigStore
 import org.awana.kiosk.policy.DevicePolicy
 import org.awana.kiosk.policy.Reporter
+import org.awana.kiosk.shared.Telemetry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -30,29 +31,36 @@ class BootReceiver : BroadcastReceiver() {
         }
 
         val appContext = context.applicationContext
-        val config = ConfigStore(appContext).load()
-        if (config == null) {
-            Log.i(TAG, "No config; device is not provisioned")
-            return
-        }
-
-        val policy = DevicePolicy(appContext)
-        if (!policy.isDeviceOwner) {
-            Log.w(TAG, "Not device owner at boot; policy not re-applied")
-            return
-        }
-
-        val result = policy.applyAll(config)
-        Log.i(TAG, "Re-applied at boot: ${result.applied}")
-        if (result.failures.isNotEmpty()) {
-            Log.e(TAG, "Policy not fully re-applied at boot: ${result.failures}")
-        }
-
+        // Also what sends reports a phone kept while it was offline, including
+        // from a setup that never got as far as making the kiosk HOME.
+        Telemetry.init(appContext)
         // Null when the receiver was invoked directly rather than by the system.
         val pending: PendingResult? = goAsync()
+
+        val config = ConfigStore(appContext).load()
+        val policy = DevicePolicy(appContext)
+        when {
+            config == null -> Log.i(TAG, "No config; device is not provisioned")
+            !policy.isDeviceOwner -> Telemetry.warn(TAG, "Not device owner at boot; policy not re-applied")
+            else -> {
+                val result = policy.applyAll(config)
+                Log.i(TAG, "Re-applied at boot: ${result.applied}")
+                if (result.failures.isNotEmpty()) {
+                    Telemetry.report(
+                        TAG,
+                        "Policy not fully re-applied at boot",
+                        extras = mapOf("failures" to result.failures),
+                    )
+                }
+            }
+        }
+
         GlobalScope.launch(Dispatchers.IO) {
             try {
-                config.serverUrl?.let { Reporter(appContext).flush(it) }
+                if (config != null && policy.isDeviceOwner) {
+                    config.serverUrl?.let { Reporter(appContext).flush(it) }
+                }
+                Telemetry.flush()
             } finally {
                 pending?.finish()
             }

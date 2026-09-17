@@ -119,6 +119,18 @@ class QrPayloadTest {
     }
 
     @Test
+    fun allowsProvisioningWithoutInternet() {
+        val payload = Json.parseToJsonElement(fixedPayload()).jsonObject
+
+        // The hotspot has no internet, and from Android 14 the wizard refuses
+        // to go on without it unless told otherwise.
+        assertEquals(
+            true,
+            payload["android.app.extra.PROVISIONING_ALLOW_OFFLINE"]!!.jsonPrimitive.boolean,
+        )
+    }
+
+    @Test
     fun theQrSizeDoesNotGrowWithTheNumberOfApps() {
         // This is why the config is fetched rather than embedded. Inline, each
         // app cost roughly 200 bytes of escaped JSON and a deployment stopped

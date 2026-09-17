@@ -10,9 +10,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import org.awana.kiosk.policy.DevicePolicy
 import org.awana.kiosk.policy.LockTaskBreakService
+import org.awana.kiosk.shared.Telemetry
 import kotlinx.coroutines.launch
 
 /**
@@ -29,6 +31,8 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Off the main thread: the first window has a hard deadline at boot.
+        lifecycleScope.launch(Dispatchers.IO) { Telemetry.init(applicationContext) }
 
         onBackPressedDispatcher.addCallback(this) {
             // Back on the home screen does nothing. Back elsewhere returns to

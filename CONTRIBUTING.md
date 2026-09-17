@@ -19,6 +19,7 @@ deliberate.
 ```
 shared/           The wire protocol both apps compile: KioskConfig, PackageSpec,
                   WifiNetwork, EnrolmentReport, AdminPin, Certificates, DeviceLabel.
+                  Also Telemetry, the Sentry reporting both apps share.
 kiosk/policy/     DevicePolicyManager wrapper, config fetch, installer, provisioning.
                   No UI dependencies.
 design/           The generated colour scheme both apps paint themselves with.
@@ -239,6 +240,24 @@ There is no DI framework and no `Application` subclass: classes construct their
 few collaborators directly. The maintaining team works in React Native, not
 Kotlin. Prefer boring code; every dependency is a maintenance liability.
 
+## Remote diagnostics
+
+Both apps report to the `simple-phone` project in the `awana-digital` Sentry
+org, through `Telemetry` in `:shared`. The DSN is the `sentryDsn` property in
+`gradle.properties`; set it empty to build without reporting. Emulators never
+report, so the instrumented suite sends nothing.
+
+A QR-provisioned phone has no USB debugging, so this is how a failed setup in
+the field gets seen. The kiosk records each step of the setup wizard's
+handshake as a Sentry log, and each outcome as an event. A field phone is
+usually offline, so it keeps events on disk and sends them at its next boot
+with internet. The trainer's app reports every request a phone makes and every
+enrolment report it receives, which often reaches Sentry sooner, since the
+trainer's phone is more often online.
+
+Sentry is started by hand, never by its ContentProvider — the manifest in
+`:shared` removes it — for the same reason nothing else runs at process start.
+
 ## Things that look like bugs but are deliberate
 
 **Updating a phone reuses the enrolment QR rather than a code of its own.** The
@@ -346,6 +365,17 @@ waits before declaring "does not have a focused window" gets the activity
 ANR-killed at boot. WorkManager's automatic initialiser did exactly that once.
 Any new startup work has to be measured the same way, on the slowest phone in
 the fleet.
+
+**The QR sets `PROVISIONING_ALLOW_OFFLINE`.** From Android 14, without it the
+setup wizard insists on internet so it can update the platform's provisioning
+role holder. The hotspot has none, so the wizard says it couldn't connect and
+returns to the scanner.
+
+**The bootstrap is kept at every step of the handshake, not only read in the
+receiver.** `ProvisioningModeActivity` and `PolicyComplianceActivity` are handed
+the admin extras too, and write the bootstrap where `pendingBootstrap` finds
+it. If the completion broadcast arrives without them, the service falls back
+to that copy rather than stopping silently.
 
 **The QR carries a bootstrap, not the config.** `onProfileProvisioningComplete`
 reads only a server URL and a SHA-256; `ConfigFetch` then downloads

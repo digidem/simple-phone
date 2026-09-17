@@ -26,6 +26,8 @@ android {
 
 dependencies {
     implementation(libs.kotlinx.serialization.json)
+    // api: callers pass SentryLevel to Telemetry.report.
+    api(libs.sentry.android.core)
 
     testImplementation(libs.junit)
 }

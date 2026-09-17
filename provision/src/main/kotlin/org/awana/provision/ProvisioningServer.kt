@@ -1,9 +1,9 @@
 package org.awana.provision
 
-import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import org.awana.kiosk.shared.EnrolmentReport
 import org.awana.kiosk.shared.ServerManifest
+import org.awana.kiosk.shared.Telemetry
 import java.io.File
 import java.io.FileInputStream
 
@@ -68,7 +68,7 @@ class ProvisioningServer(
                 else -> text(Response.Status.NOT_FOUND, "No such path")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Request for $uri failed", e)
+            Telemetry.report(TAG, "Request for $uri failed", error = e)
             text(Response.Status.INTERNAL_ERROR, "Server error: ${e.message}")
         }
     }
@@ -83,7 +83,7 @@ class ProvisioningServer(
             onReport(session.remoteIpAddress.orEmpty(), EnrolmentReport.parse(text))
             text(Response.Status.OK, "ok")
         } catch (e: Exception) {
-            Log.w(TAG, "Unreadable report: $text", e)
+            Telemetry.report(TAG, "Unreadable report: ${text.take(500)}", error = e)
             text(Response.Status.BAD_REQUEST, "Could not read that report")
         }
     }

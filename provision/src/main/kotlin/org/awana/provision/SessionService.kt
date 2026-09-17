@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import org.awana.kiosk.shared.Telemetry
 
 /**
  * Keeps the hotspot and server alive for the whole enrolment session.
@@ -27,6 +28,11 @@ class SessionService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        Telemetry.init(this)
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val profileId = intent?.getStringExtra(EXTRA_PROFILE_ID)

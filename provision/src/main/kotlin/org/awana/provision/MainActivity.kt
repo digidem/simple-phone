@@ -24,11 +24,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import org.awana.kiosk.design.AwanaTheme
+import org.awana.kiosk.shared.Telemetry
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Telemetry.init(this)
         SessionService.ensureSession(this)
         setContent { ProvisionTheme { ProvisionApp() } }
     }

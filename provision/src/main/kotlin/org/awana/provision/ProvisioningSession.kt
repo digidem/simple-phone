@@ -13,6 +13,8 @@ import org.awana.kiosk.shared.KioskConfig
 import org.awana.kiosk.shared.KioskJson
 import org.awana.kiosk.shared.PackageSpec
 import org.awana.kiosk.shared.ServerManifest
+import org.awana.kiosk.shared.Telemetry
+import io.sentry.SentryLevel
 import java.io.File
 
 data class SessionState(
@@ -111,6 +113,13 @@ class ProvisioningSession(context: Context) {
         _state.value = SessionState(profileId = profile.id, profileName = profile.name)
 
         val details = hotspot.start().getOrElse { error ->
+            Telemetry.report(
+                TAG,
+                "The hotspot did not start: ${error.message}",
+                level = SentryLevel.WARNING,
+                extras = mapOf("hotspot" to hotspot.javaClass.simpleName),
+                context = appContext,
+            )
             _state.value = failed(profile, error.message)
             return Result.failure(error)
         }
@@ -184,6 +193,7 @@ class ProvisioningSession(context: Context) {
             manifest = manifest,
             configJson = configJson,
             onReport = { address, report ->
+                noteReport(address, report)
                 _state.update {
                     it.copy(
                         reports = it.reports.replacing(report),
@@ -195,6 +205,7 @@ class ProvisioningSession(context: Context) {
             onRequest = { address, uri -> noteRequest(address, uri, steps, labels) },
         )
         runCatching { running.start(SOCKET_TIMEOUT_MS, false) }.getOrElse { error ->
+            Telemetry.report(TAG, "The server could not start", error = error, context = appContext)
             hotspot.stop()
             _state.value = failed(profile, "The server could not start: ${error.message}")
             return Result.failure(error)
@@ -212,6 +223,11 @@ class ProvisioningSession(context: Context) {
             configSha256 = configSha256,
         )
 
+        Telemetry.info(
+            TAG,
+            "Session started at $serverUrl: ${hotspot.javaClass.simpleName}, " +
+                "security ${details.securityType}, ${specs.size} app(s), QR ${payload.length} bytes",
+        )
         _state.value = SessionState(
             running = true,
             profileId = profile.id,
@@ -237,6 +253,7 @@ class ProvisioningSession(context: Context) {
         steps: List<String>,
         labels: Map<String, String>,
     ) {
+        Telemetry.info(TAG, "$address requested $uri")
         if (uri == REPORT_PATH) return
         val at = steps.indexOf(uri)
         if (at < 0) return
@@ -254,6 +271,26 @@ class ProvisioningSession(context: Context) {
                 downloading = state.downloading.filterNot { it.address == address } + updated,
             )
         }
+    }
+
+    /** The field phone may never get online itself; this phone often is. */
+    private fun noteReport(address: String, report: EnrolmentReport) {
+        val failures = report.failures + report.permissionFailures
+        Telemetry.report(
+            TAG,
+            "Enrolment report from ${report.deviceLabel}: ${failures.size} failure(s)",
+            level = if (failures.isEmpty()) SentryLevel.INFO else SentryLevel.WARNING,
+            extras = mapOf(
+                "address" to address,
+                "device" to "${report.manufacturer} ${report.model}",
+                "android" to "${report.androidVersion} (API ${report.apiLevel})",
+                "kioskVersion" to report.kioskVersion,
+                "isDeviceOwner" to report.isDeviceOwner,
+                "failures" to failures,
+                "packages" to report.packageOutcomes,
+                "hostileOem" to report.hostileOem,
+            ),
+        )
     }
 
     private fun failed(profile: DeploymentProfile, message: String?) =
@@ -275,6 +312,7 @@ class ProvisioningSession(context: Context) {
     }
 
     private companion object {
+        const val TAG = "ProvisioningSession"
         const val PORT = 8080
         const val SOCKET_TIMEOUT_MS = 60_000
         const val KIOSK_APK = "kiosk.apk"

@@ -26,6 +26,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Provision">
 
+        <meta-data android:name="io.sentry.dsn" android:value="${sentryDsn}" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

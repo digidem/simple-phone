@@ -193,7 +193,16 @@ class Provisioner(
      */
     fun recordBootstrapFailure(reason: String, bootstrap: ProvisioningBootstrap? = null) {
         saveLastReport(buildReport(config = null, failures = listOf(reason)))
-        bootstrap?.let { File(appContext.filesDir, PENDING_BOOTSTRAP).writeText(it.encode()) }
+        bootstrap?.let { rememberBootstrap(it) }
+    }
+
+    /**
+     * Kept from the setup wizard's handshake as well as from a failed fetch:
+     * not every wizard still carries the admin extras by the time
+     * `onProfileProvisioningComplete` runs.
+     */
+    fun rememberBootstrap(bootstrap: ProvisioningBootstrap) {
+        File(appContext.filesDir, PENDING_BOOTSTRAP).writeText(bootstrap.encode())
     }
 
     /** The bootstrap of an attempt that never reached a config, for a retry. */

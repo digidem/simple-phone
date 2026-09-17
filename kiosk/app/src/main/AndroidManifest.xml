@@ -28,6 +28,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Kiosk">
 
+        <meta-data android:name="io.sentry.dsn" android:value="${sentryDsn}" />
+
         <!--
           Nothing runs at process start: the launcher is the HOME activity and
           anything that delays its first window past the input-dispatch grace

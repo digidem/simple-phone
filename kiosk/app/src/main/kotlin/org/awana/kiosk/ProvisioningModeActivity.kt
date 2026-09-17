@@ -25,6 +25,7 @@ class ProvisioningModeActivity : Activity() {
         val extras = intent.getParcelableExtra<PersistableBundle>(
             DevicePolicyManager.EXTRA_PROVISIONING_ADMIN_EXTRAS_BUNDLE,
         )
+        Handshake.note(this, "Provisioning mode", extras)
         val result = Intent()
             .putExtra(
                 DevicePolicyManager.EXTRA_PROVISIONING_MODE,

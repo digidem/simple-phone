@@ -26,6 +26,10 @@ import org.awana.kiosk.shared.KioskJson
  * `LEAVE_ALL_SYSTEM_APPS_ENABLED` must be true. Without it, provisioning
  * disables non-required system apps, which can take out components the
  * deployment needs.
+ *
+ * `ALLOW_OFFLINE` must be true. From Android 14 the wizard otherwise insists on
+ * internet to update the platform's provisioning role holder, and the hotspot
+ * has none: it says "couldn't connect to the internet" and returns to the scanner.
  */
 object QrPayload {
 
@@ -65,6 +69,7 @@ object QrPayload {
             put("android.app.extra.PROVISIONING_WIFI_SECURITY_TYPE", wifiSecurityType)
             put("android.app.extra.PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED", JsonPrimitive(true))
             put("android.app.extra.PROVISIONING_SKIP_ENCRYPTION", JsonPrimitive(true))
+            put("android.app.extra.PROVISIONING_ALLOW_OFFLINE", JsonPrimitive(true))
             put("android.app.extra.PROVISIONING_LOCALE", locale)
             put("android.app.extra.PROVISIONING_TIME_ZONE", timeZone)
             put(
