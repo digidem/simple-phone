@@ -25,7 +25,7 @@ object ConfigFetch {
     private const val FIRST_BACKOFF_MS = 1_000L
 
     /**
-     * [attempts] is raised by the update path: enrolment arrives already on the
+     * [attempts] is raised by the update path: an update arrives already on the
      * trainer's hotspot, but a phone in the field has just been told to join it
      * and association can take longer than the default backoff allows.
      */

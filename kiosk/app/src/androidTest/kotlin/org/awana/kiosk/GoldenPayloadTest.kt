@@ -17,7 +17,7 @@ import org.junit.runner.RunWith
 /**
  * The QR shape, read back the way the receiver reads it.
  *
- * `:provision`'s `QrPayloadTest` generates
+ * `:setup`'s `QrPayloadTest` generates
  * `testdata/provisioning-qr.golden.json` and this test parses it exactly as
  * `KioskDeviceAdminReceiver` would. Both apps compile the config and report
  * types out of `shared/`, so those cannot drift; the QR is the one part of the

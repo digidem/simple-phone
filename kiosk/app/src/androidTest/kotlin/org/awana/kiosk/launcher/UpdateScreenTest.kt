@@ -12,7 +12,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import org.awana.kiosk.shared.EnrolmentReport
+import org.awana.kiosk.shared.SetupReport
 import org.awana.kiosk.shared.InstallResult
 import org.awana.kiosk.shared.InstalledPackage
 import org.awana.kiosk.shared.PackageOutcome
@@ -37,7 +37,7 @@ class UpdateScreenTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     private fun report(vararg outcomes: Pair<String, InstallResult>, failures: List<String> = emptyList()) =
-        EnrolmentReport(
+        SetupReport(
             deviceId = "device",
             deviceLabel = "AB23",
             deploymentId = "rio-negro",

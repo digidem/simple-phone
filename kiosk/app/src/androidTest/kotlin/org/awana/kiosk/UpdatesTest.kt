@@ -7,7 +7,7 @@ import kotlinx.coroutines.runBlocking
 import org.awana.kiosk.policy.Updates
 import org.awana.kiosk.shared.Certificates
 import org.awana.kiosk.shared.Digests
-import org.awana.kiosk.shared.EnrolmentCode
+import org.awana.kiosk.shared.SetupCode
 import org.awana.kiosk.shared.ProvisioningBootstrap
 import org.awana.kiosk.shared.WifiNetwork
 import org.junit.After
@@ -24,7 +24,7 @@ import java.io.File
  * The step between scanning a code on a phone already in service and applying
  * anything: join, fetch, verify — and stop.
  *
- * Driven with an [EnrolmentCode] rather than a photograph of a QR, the same way
+ * Driven with an [SetupCode] rather than a photograph of a QR, the same way
  * `provision()` is driven with a config rather than a setup wizard. The QR
  * itself is a parsing problem and is covered by `:shared`'s unit tests.
  */
@@ -54,9 +54,9 @@ class UpdatesTest {
     }
 
     private fun ourChecksum() =
-        EnrolmentCode.checksumOf(Certificates.ofInstalledPackage(context, context.packageName).first())
+        SetupCode.checksumOf(Certificates.ofInstalledPackage(context, context.packageName).first())
 
-    private fun code(url: String, hash: String, checksum: String = ourChecksum()) = EnrolmentCode(
+    private fun code(url: String, hash: String, checksum: String = ourChecksum()) = SetupCode(
         bootstrap = ProvisioningBootstrap(url, hash),
         // No hotspot in a test; the emulator reaches the server on loopback.
         wifi = WifiNetwork("Awana-Setup", "correcthorsebattery"),
@@ -97,7 +97,7 @@ class UpdatesTest {
             code(
                 running.url,
                 Digests.sha256Hex(config.toByteArray()),
-                checksum = EnrolmentCode.checksumOf("0".repeat(64)),
+                checksum = SetupCode.checksumOf("0".repeat(64)),
             ),
         )
 

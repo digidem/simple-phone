@@ -131,7 +131,7 @@ class ConfigFetchTest {
 
     @Test
     fun theHashIsOverTheBytesAsServedNotTheReparsedForm() = runBlocking {
-        // The provisioning app serves its config verbatim for this reason. If
+        // The setup app serves its config verbatim for this reason. If
         // either side re-encoded, the hashes would differ despite the config
         // being identical, and every device would refuse a genuine deployment.
         val body = config().encode()

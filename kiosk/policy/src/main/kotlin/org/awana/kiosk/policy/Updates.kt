@@ -2,7 +2,7 @@ package org.awana.kiosk.policy
 
 import android.content.Context
 import org.awana.kiosk.shared.Certificates
-import org.awana.kiosk.shared.EnrolmentCode
+import org.awana.kiosk.shared.SetupCode
 import org.awana.kiosk.shared.KioskConfig
 import java.io.File
 
@@ -40,13 +40,13 @@ object Updates {
      * otherwise change a production phone's PIN, and KEYS.md is explicit that
      * the two fleets must never mix.
      */
-    suspend fun prepare(context: Context, code: EnrolmentCode): Result<KioskConfig> {
+    suspend fun prepare(context: Context, code: SetupCode): Result<KioskConfig> {
         val ours = Certificates.ofInstalledPackage(context, context.packageName)
         if (!code.signedBySameKeyAs(ours)) {
             return Result.failure(
                 RefusedException(
                     Refusal.OtherFleet,
-                    "This code is from a different Field Kiosk build than the one on this phone.",
+                    "This code is from a different Simple Phone build than the one on this phone.",
                 ),
             )
         }

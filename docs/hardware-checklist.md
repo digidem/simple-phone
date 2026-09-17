@@ -5,7 +5,7 @@ emulator. Work through it on each phone model before that model is used for a
 real deployment.
 
 You do not need to be the author of this code to run it. You need a phone you
-can factory reset, a second phone with the Field Kiosk Setup app on it, and
+can factory reset, a second phone with the Phone Setup app on it, and
 about an hour per model.
 
 **What the emulator already told us** is recorded against each item. An AOSP
@@ -153,7 +153,7 @@ This is the one that quietly ruins deployments weeks later.
 
 There is no DPM API for any of this at any Android version — not for doze, not
 for app-standby, and nothing at all that reaches vendor battery managers. The
-kiosk detects known-hostile manufacturers and flags them in the enrolment
+kiosk detects known-hostile manufacturers and flags them in the setup
 report, so the setup app tells the trainer a manual step is needed. It does not
 try to automate the vendor screens, and should not.
 
@@ -258,7 +258,7 @@ only item that tests the parts of the flow the platform owns.
 
 1. Factory reset the phone.
 2. Tap the middle of the first "Hello" screen six times.
-3. Scan the QR from the setup app.
+3. Scan the setup code from the setup app.
 4. Watch it through to the kiosk home screen without touching it.
 
 **Record at each stage:**

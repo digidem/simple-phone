@@ -5,7 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
-import org.awana.kiosk.shared.EnrolmentReport
+import org.awana.kiosk.shared.SetupReport
 import org.awana.kiosk.shared.InstalledPackage
 import java.io.File
 
@@ -19,7 +19,7 @@ class Reporter(context: Context) {
     private val queueDir = File(appContext.filesDir, "report-queue")
 
     /** Sends [report], queueing it for a later retry if the POST fails. */
-    suspend fun send(serverUrl: String, report: EnrolmentReport): Boolean {
+    suspend fun send(serverUrl: String, report: SetupReport): Boolean {
         val body = report.encode()
         val sent = Http.postJson("${serverUrl.trimEnd('/')}/report", body).isSuccess
         if (!sent) {

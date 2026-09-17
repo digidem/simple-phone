@@ -6,18 +6,18 @@ import kotlinx.serialization.json.Json
 /**
  * The deployment configuration document.
  *
- * Built by the provision app, served at [CONFIG_PATH], hashed into the
+ * Built by the setup app, served at [CONFIG_PATH], hashed into the
  * provisioning QR, and held by the kiosk in private storage afterwards. Both
  * apps compile this exact type, so the wire format cannot drift.
  */
 @Serializable
 data class KioskConfig(
     val schemaVersion: Int = SCHEMA_VERSION,
-    /** The provision app's profile id: stable across sessions of one deployment. */
+    /** The setup app's profile id: stable across sessions of one deployment. */
     val deploymentId: String,
     val deploymentName: String,
     val adminPinHash: String,
-    /** Base URL of the provisioning server the device enrolled from. */
+    /** Base URL of the provisioning server the phone was set up from. */
     val serverUrl: String? = null,
     /** Installed, uninstall-blocked and lock-task allowlisted. */
     val packages: List<PackageSpec> = emptyList(),
@@ -51,7 +51,7 @@ data class KioskConfig(
      */
     val screenLock: Boolean = false,
     /**
-     * Version of the kiosk the trainer's app is serving at [DPC_PATH].
+     * Version of the kiosk the setup app is serving at [DPC_PATH].
      *
      * A phone updates itself when this is higher than what it is running. It
      * travels in the config rather than the manifest because the config is the
@@ -93,7 +93,7 @@ data class KioskConfig(
         /** Path the config is served from, relative to the server URL. */
         const val CONFIG_PATH = "/config.json"
 
-        /** Where the trainer's app serves the kiosk APK; see [kioskVersionCode]. */
+        /** Where the setup app serves the kiosk APK; see [kioskVersionCode]. */
         const val DPC_PATH = "/dpc.apk"
 
         fun parse(text: String): KioskConfig =
@@ -170,7 +170,7 @@ data class PackageSpec(
     val packageName: String,
     /**
      * Lowercase hex SHA-256 of the signing certificate, recorded by the
-     * provision app when the trainer added the APK. The kiosk refuses a first
+     * setup app when the trainer added the APK. The kiosk refuses a first
      * install that presents anything else.
      */
     val certSha256: String,
@@ -202,7 +202,7 @@ object KioskJson {
     }
 
     /**
-     * No pretty-printing and no defaults. Used for what the provision app
+     * No pretty-printing and no defaults. Used for what the setup app
      * serves and hashes; the fewer bytes the better on a hotspot, and the
      * served bytes are what the QR's hash is over.
      */

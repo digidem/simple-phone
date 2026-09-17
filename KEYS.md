@@ -1,6 +1,6 @@
 # Signing keys and custody
 
-One key signs both Field Kiosk and Field Kiosk Setup, from one
+One key signs both Simple Phone and Phone Setup, from one
 `keystore.properties` at the repository root. It is **separate from the key of
 any app a deployment installs**, and neither of these apps goes to Google Play,
 so there is no Play App Signing and no recovery path through Google.
@@ -10,7 +10,7 @@ so there is no Play App Signing and no recovery path through Google.
 A Device Owner cannot be uninstalled, and Android will not replace an installed
 APK with one signed by a different key. So if the kiosk signing key is lost:
 
-- no enrolled device can ever receive a kiosk update again, and
+- no phone already set up can ever receive a kiosk update again, and
 - the only remedy is factory resetting every device in every fleet.
 
 The key is also baked into every provisioning QR, via
@@ -30,10 +30,10 @@ record who holds them below.
 
 A device provisioned with a debug-signed kiosk can never receive production
 updates — the keys differ, so the update is refused. Test and production fleets
-must stay strictly separate. The trainer's app bundles the kiosk APK of its own
-build type, so a debug Field Kiosk Setup provisions a debug fleet.
+must stay strictly separate. The setup app bundles the kiosk APK of its own
+build type, so a debug Phone Setup provisions a debug fleet.
 
-The signing key is visible in the admin screen and in every enrolment report as
+The signing key is visible in the admin screen and in every setup report as
 `buildVariant`, which reads `sig:<first 16 hex of the cert SHA-256>`. Check it
 before handing a device to a partner organisation.
 
@@ -46,7 +46,7 @@ keytool -genkeypair -v \
   -keystore kiosk-release.jks \
   -alias kiosk \
   -keyalg RSA -keysize 4096 -validity 18250 \
-  -dname "CN=Field Kiosk, O=Awana Digital, C=US"
+  -dname "CN=Simple Phone, O=Awana Digital, C=US"
 ```
 
 `keytool` writes a PKCS12 keystore, which holds one password rather than two, so
@@ -69,21 +69,21 @@ failing, so **check `buildVariant` on the built APK** rather than assuming.
 ## Building a release
 
 ```sh
-./gradlew :provision:assembleRelease
+./gradlew :setup:assembleRelease
 ```
 
 That is the whole thing. It builds the kiosk, signs it, bundles the signed APK
-into the trainer's app, and signs that. The order matters and Gradle already
-holds it: Field Kiosk Setup serves the bundled kiosk APK and reads the
+into the setup app, and signs that. The order matters and Gradle already
+holds it: Phone Setup serves the bundled kiosk APK and reads the
 provisioning QR's signature checksum out of that file at runtime, so the kiosk
-has to be signed before the trainer's app is built around it. Signing an APK
+has to be signed before the setup app is built around it. Signing an APK
 does not reach into its assets.
 
 Check the result rather than assuming, since a missing `keystore.properties`
 falls back to debug signing instead of failing:
 
 ```sh
-apksigner verify --print-certs provision/build/outputs/apk/release/provision-release.apk
+apksigner verify --print-certs setup/build/outputs/apk/release/setup-release.apk
 ```
 
 ## Signing lineage (v3 key rotation)
@@ -117,7 +117,7 @@ apksigner sign \
   --next-signer --ks kiosk-next.jks --ks-key-alias kiosk-next \
   --lineage kiosk.lineage \
   --v1-signing-enabled false --v2-signing-enabled false --v3-signing-enabled true \
-  --out field-kiosk.apk app-release-unsigned.apk
+  --out simple-phone.apk app-release-unsigned.apk
 ```
 
 After rotating, `buildVariant` reports a different `sig:` on Android 13+ than on

@@ -42,7 +42,7 @@ import org.awana.kiosk.policy.Provisioning
 import org.awana.kiosk.policy.UpdateProgress
 import org.awana.kiosk.policy.UpdateState
 import org.awana.kiosk.policy.Updates
-import org.awana.kiosk.shared.EnrolmentReport
+import org.awana.kiosk.shared.SetupReport
 import org.awana.kiosk.shared.InstallResult
 import org.awana.kiosk.shared.KioskConfig
 
@@ -223,7 +223,7 @@ fun UpdateWorking(what: String, onBack: (() -> Unit)?) {
 }
 
 @Composable
-fun UpdateFinished(report: EnrolmentReport, onBack: () -> Unit) {
+fun UpdateFinished(report: SetupReport, onBack: () -> Unit) {
     val changed = report.packageOutcomes.count {
         it.result == InstallResult.Installed || it.result == InstallResult.Updated
     }

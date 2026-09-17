@@ -12,7 +12,7 @@ STORE=kiosk-dev.jks
 NEXT=kiosk-dev-next.jks
 LINEAGE=kiosk-dev.lineage
 PASS=devdevdev
-DNAME="CN=Field Kiosk (development), O=Awana Digital, C=US"
+DNAME="CN=Simple Phone (development), O=Awana Digital, C=US"
 
 if [ -f "$STORE" ]; then
   echo "$STORE already exists; leaving it alone."

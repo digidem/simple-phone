@@ -26,8 +26,8 @@ import java.io.File
  *
  * This is the seam paying off — `provision()` is called directly with a
  * synthesised config, so none of this needs a camera or a setup wizard.
- * [DeploymentServer] stands in for the trainer's app, whose own endpoints are
- * covered by `:provision`'s tests; `ProvisioningServiceTest` covers the step
+ * [DeploymentServer] stands in for the setup app, whose own endpoints are
+ * covered by `:setup`'s tests; `ProvisioningServiceTest` covers the step
  * before this one, where a bootstrap becomes a config. Between them the only
  * untested part of the loop is the radio.
  */

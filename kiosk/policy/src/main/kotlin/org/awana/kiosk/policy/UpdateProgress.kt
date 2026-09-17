@@ -3,7 +3,7 @@ package org.awana.kiosk.policy
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.awana.kiosk.shared.EnrolmentReport
+import org.awana.kiosk.shared.SetupReport
 
 /**
  * Where an update reports what it is doing, for the screen that shows it.
@@ -52,7 +52,7 @@ sealed interface UpdateState {
      */
     data object UpdatingKiosk : UpdateState
 
-    data class Done(val report: EnrolmentReport) : UpdateState
+    data class Done(val report: SetupReport) : UpdateState
 
     data class Failed(val reason: String) : UpdateState
 

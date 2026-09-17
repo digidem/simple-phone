@@ -1,14 +1,14 @@
 package org.awana.kiosk
 
 import fi.iki.elonen.NanoHTTPD
-import org.awana.kiosk.shared.EnrolmentReport
+import org.awana.kiosk.shared.SetupReport
 import org.awana.kiosk.shared.KioskConfig
 import java.io.File
 import java.io.FileInputStream
 
 /**
- * Stands in for the trainer's app: serves the deployment config and the payload
- * APKs, and keeps the enrolment reports that come back.
+ * Stands in for the setup app: serves the deployment config and the payload
+ * APKs, and keeps the setup reports that come back.
  *
  * [config] is served as the exact bytes it is given, never re-encoded, because
  * the hash in the QR is over the bytes as served and re-encoding on either side
@@ -16,7 +16,7 @@ import java.io.FileInputStream
  */
 class DeploymentServer(private val apk: File) : NanoHTTPD(0) {
 
-    val reports = mutableListOf<EnrolmentReport>()
+    val reports = mutableListOf<SetupReport>()
 
     /** Every path a device asked for, so a test can assert what it did *not* fetch. */
     val fetched = mutableListOf<String>()
@@ -40,7 +40,7 @@ class DeploymentServer(private val apk: File) : NanoHTTPD(0) {
         session.method == Method.POST && session.uri == "/report" -> {
             val body = HashMap<String, String>()
             session.parseBody(body)
-            reports += EnrolmentReport.parse(body["postData"].orEmpty())
+            reports += SetupReport.parse(body["postData"].orEmpty())
             newFixedLengthResponse("ok")
         }
 

@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Phone Setup</string>
+
+    <string name="session_notification_title">Setting up devices</string>
+    <string name="session_notification_body">Hotspot on for “%1$s”. Keep this screen nearby.</string>
+
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_back">Back</string>
+    <string name="action_save">Save</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_duplicate">Make a copy</string>
+    <string name="action_export">Export</string>
+    <string name="action_import">Import</string>
+    <string name="action_add">Add</string>
+    <string name="action_done">Done</string>
+    <string name="action_more">More</string>
+
+    <string name="tab_deployments">Deployments</string>
+    <string name="tab_apps">App files</string>
+    <string name="tab_help">How to</string>
+
+    <string name="deployments_title">Deployments</string>
+    <string name="deployments_empty">No deployments yet. Create one to get started.</string>
+    <string name="deployments_new">New deployment</string>
+    <string name="deployment_start">Set up and update phones</string>
+    <string name="deployment_name">Name of this deployment</string>
+    <string name="deployment_pin">Admin PIN for these devices</string>
+    <string name="deployment_pin_help">Trainers use this PIN to unlock the settings screen on a device. Write it down: it cannot be read back from here.</string>
+    <string name="deployment_pin_unchanged">The PIN is already set. Type a new one only if you want to change it.</string>
+    <string name="deployment_home_screen">Home screen</string>
+    <string name="deployment_apps_installed">Apps installed</string>
+    <string name="deployment_language_and_time">Language and time</string>
+    <string name="deployment_remove_app">Take out of this deployment</string>
+    <plurals name="deployment_summary">
+        <item quantity="one">%1$d app · %2$s</item>
+        <item quantity="other">%1$d apps · %2$s</item>
+    </plurals>
+    <string name="preview_nothing_shown">Nothing is set to appear on the home screen yet.</string>
+    <string name="deployment_locale">Language</string>
+    <string name="deployment_timezone">Time zone</string>
+    <string name="deployment_screen_timeout">Screen turns off after</string>
+    <plurals name="deployment_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <string name="deployment_add_app">Add an app</string>
+    <string name="deployment_no_apps_left">Every app in the library is already in this deployment. Add more files in the App files tab.</string>
+    <string name="deployment_no_apps">Add apps in the App files tab first.</string>
+    <string name="deployment_wifi">Wi-Fi networks for these devices</string>
+    <string name="deployment_wifi_help">Devices join these networks on their own. Add the team\'s sync network here — people using a device cannot add one themselves without the admin PIN.</string>
+    <string name="deployment_wifi_ssid">Network name</string>
+    <string name="deployment_wifi_passphrase">Password (leave empty for an open network)</string>
+    <string name="deployment_wifi_add">Add a Wi-Fi network</string>
+    <string name="deployment_export_saved">Saved this deployment to the file you chose.</string>
+    <string name="deployment_export_failed">That deployment could not be saved there. Choose another folder and try again.</string>
+    <string name="deployment_import_unreadable">That file could not be read. Choose the deployment file you were sent.</string>
+    <string name="deployment_import_not_a_deployment">That file is not a deployment. Choose the file a colleague exported from this app.</string>
+
+    <string name="deployment_delete_title">Delete “%1$s”?</string>
+    <string name="deployment_delete_unaffected">Phones already set up with it are not affected — they keep working, and their admin PIN does not change.</string>
+    <string name="deployment_delete_body">You will not be able to set up more phones the same way unless you make the deployment again, or import it from an exported file.</string>
+
+    <string name="entry_how_it_appears">How it appears</string>
+    <string name="entry_role">Role on the home screen</string>
+    <string name="entry_role_hero">Hero</string>
+    <string name="entry_role_small">Small card</string>
+    <string name="entry_role_hidden">Hidden</string>
+    <string name="entry_role_hint">Only one app can be the hero. Choosing it here moves the badge off whichever app has it now.</string>
+    <string name="entry_name_and_description">Name and description</string>
+    <string name="entry_name">Name on the phone</string>
+    <string name="entry_subtitle">Description</string>
+    <string name="entry_name_hint">Both default to what the app calls itself. Change them to the words this team uses — the phone shows these, not the app\'s own name.</string>
+    <string name="entry_icon">Icon</string>
+    <string name="entry_icon_own">The app\'s own icon</string>
+    <string name="entry_icon_picture">A picture you chose</string>
+    <string name="entry_icon_change">Tap to use a picture instead</string>
+    <string name="entry_icon_use_own">Go back to the app\'s own icon</string>
+    <string name="entry_not_on_home">Installed, not shown on the home screen</string>
+    <string name="entry_no_description">No description</string>
+    <string name="entry_file_missing">The file for this app is not in the library</string>
+
+    <string name="shade_title">Notification shade</string>
+    <string name="shade_allow">Allow the notification shade</string>
+    <string name="shade_on_body">Users can pull the shade down</string>
+    <string name="shade_off_body">Off — the shade cannot be pulled down</string>
+    <string name="shade_off_explain">With this off, the battery and signal icons stay visible but the shade cannot be pulled down, so mobile data and airplane mode cannot be changed by accident.</string>
+    <string name="shade_costs_title">Turning it on has three costs</string>
+
+    <string name="apps_title">App files</string>
+    <string name="apps_empty">No apps yet. Add the APK files you want to install on devices.</string>
+    <string name="apps_add">Add an APK file</string>
+    <string name="apk_package">Package</string>
+    <string name="apk_version">Version</string>
+    <string name="apk_size">Size</string>
+    <string name="apk_replace">Replace file</string>
+    <string name="apk_remove">Remove</string>
+    <string name="apk_used_in">Used in</string>
+    <string name="apk_used_in_none">No deployment installs this app yet.</string>
+    <string name="apk_used_in_none_short">not used yet</string>
+    <plurals name="apk_in_deployments">
+        <item quantity="one">in %1$d deployment</item>
+        <item quantity="other">in %1$d deployments</item>
+    </plurals>
+    <string name="apps_fingerprint">Signing fingerprint</string>
+    <string name="apps_version">Version %1$s (%2$d)</string>
+    <string name="apps_size">%1$d MB</string>
+
+    <string name="apk_key_changed_title">This file is signed with a different key</string>
+    <string name="apk_key_changed_body">The version you are adding was not signed by whoever signed the one you have.</string>
+    <string name="apk_key_changed_consequence">Every phone already set up will refuse this update, and keep the version it has. Only continue if you know why the key changed.</string>
+    <string name="apk_key_changed_you_have">You have</string>
+    <string name="apk_key_changed_adding">You are adding</string>
+    <string name="apk_replace_anyway">Replace anyway</string>
+    <string name="apk_remove_title">Remove %1$s from the library?</string>
+    <plurals name="apk_remove_in_use">
+        <item quantity="one">%1$d deployment installs this app:</item>
+        <item quantity="other">%1$d deployments install this app:</item>
+    </plurals>
+    <string name="apk_remove_unused">No deployment installs this app, so nothing is affected.</string>
+    <string name="apk_remove_consequence">You will not be able to set up phones with them until you add the file back or take the app out of each one. Phones already set up are not affected.</string>
+    <string name="apk_fingerprint_hint">A phone refuses any file whose fingerprint does not match the one recorded when the deployment was made.</string>
+    <string name="apps_added">Added %1$s.</string>
+
+    <string name="session_title">Phones on this deployment</string>
+    <string name="session_step_1"><![CDATA[Take the new phone out of the box, or <b>factory reset</b> it if it has been used before.]]></string>
+    <string name="session_step_2"><![CDATA[Turn it on. On the very first <b>Hello</b> screen, tap the middle of the screen <b>six times</b>.]]></string>
+    <string name="session_step_3">A camera opens by itself. Point it at the code above and hold steady.</string>
+    <!-- The same code updates a phone that is already in service; see SetupCode. -->
+    <string name="session_already_set_up_title">A phone you already set up</string>
+    <string name="session_already_set_up"><![CDATA[Hold the <b>top-left corner</b>, enter the admin PIN, tap <b>Update this phone</b>, and scan the same code.]]></string>
+    <string name="session_requires_android9">The phone must be freshly reset, and running Android 11 or newer.</string>
+    <string name="session_waiting">Waiting for the first device…</string>
+
+    <string name="session_idle">No phones yet</string>
+    <string name="session_idle_body">They appear here as they start</string>
+    <plurals name="session_busy">
+        <item quantity="one">%1$d phone setting up</item>
+        <item quantity="other">%1$d phones setting up</item>
+    </plurals>
+    <string name="session_busy_body">%1$d finished</string>
+    <plurals name="session_done">
+        <item quantity="one">%1$d phone set up</item>
+        <item quantity="other">%1$d phones set up</item>
+    </plurals>
+    <string name="session_done_body">Nothing is part-way through</string>
+    <plurals name="session_problem">
+        <item quantity="one">%1$d phone had a problem</item>
+        <item quantity="other">%1$d phones had a problem</item>
+    </plurals>
+    <string name="session_problem_body">%1$d set up · nothing part-way through</string>
+
+    <string name="session_stop">Stop and turn off the hotspot</string>
+    <string name="session_stop_busy">Stop setting up phones</string>
+    <plurals name="session_stop_confirm_title">
+        <item quantity="one">Stop while %1$d phone is part-way?</item>
+        <item quantity="other">Stop while %1$d phones are part-way?</item>
+    </plurals>
+    <string name="session_stop_confirm_body">Turning the hotspot off now cuts them off mid-install. They will be left unfinished and will need setting up again from the start.</string>
+    <string name="session_stop_confirm_wait">Wait until the status says nothing is part-way through, and stopping is safe.</string>
+    <string name="session_stop_keep_going">Keep going</string>
+    <string name="session_stop_anyway">Stop anyway</string>
+
+    <string name="phones_title">Phones</string>
+    <string name="phone_unnamed">A phone</string>
+    <string name="phone_starting">Starting</string>
+    <string name="phone_copying">Copying %1$s · %2$d%%</string>
+    <string name="phone_silent">Stopped responding %1$d minutes ago, at %2$d%%</string>
+    <string name="phone_ok">Set up</string>
+    <string name="phone_ok_body">Everything installed and the lock is on.</string>
+    <string name="phone_apps_installed">Apps installed</string>
+    <string name="phone_settings_applied">Settings applied</string>
+    <string name="phone_not_installed">Not installed</string>
+    <string name="phone_problem">Something did not finish</string>
+
+    <string name="session_manual_title">Set the hotspot up by hand</string>
+    <string name="session_manual_help">If this phone cannot start a hotspot on its own, turn on the hotspot in Settings, then type its name and password here.</string>
+    <string name="session_manual_ssid">Hotspot name</string>
+    <string name="session_manual_passphrase">Hotspot password</string>
+    <string name="session_permission_refused">To start its own hotspot this phone needs the nearby Wi-Fi permission. Allow it in Settings, or set the hotspot up by hand below.</string>
+    <string name="session_qr_too_big">This deployment does not fit in a code a phone camera can read reliably. Remove some apps, or shorten the deployment name.</string>
+
+    <string name="report_permission_failed">Allow this by hand on the device: %1$s</string>
+
+    <string name="help_title">Setting up a phone</string>
+    <string name="help_step1">1. Start a deployment on this phone. A square code appears.</string>
+    <string name="help_step2">2. Factory reset the new phone, or take it out of the box.</string>
+    <string name="help_step3">3. On its first “Hello” screen, tap the middle of the screen six times.</string>
+    <string name="help_step4">4. The phone opens a camera. Point it at the square code.</string>
+    <string name="help_step5">5. The phone joins this phone\'s hotspot and installs everything. Leave the two phones near each other.</string>
+    <string name="help_step6">6. When it finishes, the phone shows the Simple Phone home screen and appears in the list here.</string>
+    <string name="help_wifi">Before you start, disconnect this phone from any Wi-Fi network. If it stays joined to one, the code can send the new phones to the wrong address and they will wait forever.</string>
+    <string name="help_power">Bring a power bank. Running the hotspot and sending the apps drains this phone quickly — that, rather than speed, is what limits how many phones you can do in one go.</string>
+    <string name="phone_app_installed">Newly installed</string>
+    <string name="phone_app_updated">Updated</string>
+    <string name="phone_app_already_current">Already up to date</string>
+    <string name="phone_app_failed">Did not install</string>
+    <string name="screen_lock_title">Lock screen</string>
+    <string name="screen_lock_on_body">The phone keeps its own lock screen, so a PIN or pattern can be set on it. Also protects the phone between switching on and the launcher taking over.</string>
+    <string name="screen_lock_off_body">No lock screen. The phone wakes straight into the launcher, with nothing to swipe or read.</string>
+</resources>

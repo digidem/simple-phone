@@ -26,7 +26,7 @@ import org.awana.kiosk.shared.PackageSpec
 import org.awana.kiosk.shared.ProvisioningBootstrap
 import org.junit.After
 import androidx.compose.ui.res.stringResource
-import org.awana.kiosk.shared.EnrolmentReport
+import org.awana.kiosk.shared.SetupReport
 import org.awana.kiosk.shared.InstallResult
 import org.awana.kiosk.shared.InstalledPackage
 import org.awana.kiosk.shared.PackageOutcome
@@ -284,7 +284,7 @@ class ScreenshotTest {
 
     // --- updating a phone already in service --------------------------------
 
-    private fun updateReport(vararg outcomes: Pair<String, InstallResult>) = EnrolmentReport(
+    private fun updateReport(vararg outcomes: Pair<String, InstallResult>) = SetupReport(
         deviceId = "device",
         deviceLabel = "AB23",
         deploymentId = "rio-negro",

@@ -65,5 +65,5 @@ echo "== launcher UI on $UI_SERIAL (kiosk_ui_30) =="
 ANDROID_SERIAL="$UI_SERIAL" ./gradlew :kiosk:app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.package=org.awana.kiosk.launcher
 
-echo "== provision app on $UI_SERIAL (kiosk_ui_30) =="
-ANDROID_SERIAL="$UI_SERIAL" ./gradlew :provision:testDebugUnitTest :provision:connectedDebugAndroidTest
+echo "== setup app on $UI_SERIAL (kiosk_ui_30) =="
+ANDROID_SERIAL="$UI_SERIAL" ./gradlew :setup:testDebugUnitTest :setup:connectedDebugAndroidTest

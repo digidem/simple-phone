@@ -2,7 +2,7 @@ package org.awana.kiosk.policy
 
 import org.awana.kiosk.shared.KioskConfig
 import org.awana.kiosk.shared.DeviceLabel
-import org.awana.kiosk.shared.EnrolmentReport
+import org.awana.kiosk.shared.SetupReport
 import org.awana.kiosk.shared.Certificates
 import org.awana.kiosk.shared.InstallResult
 import org.awana.kiosk.shared.InstalledPackage
@@ -14,7 +14,7 @@ import android.util.Log
 import java.io.File
 
 data class ProvisionResult(
-    val report: EnrolmentReport,
+    val report: SetupReport,
     val reportDelivered: Boolean,
 ) {
     val succeeded: Boolean get() = report.failures.isEmpty()
@@ -43,7 +43,7 @@ class Provisioner(
 
     /**
      * [onStep] lets the admin screen show what is happening. It is optional
-     * because the enrolment path has the setup wizard's own progress in front
+     * because the provisioning path has the setup wizard's own progress in front
      * of it, and because every test drives this without a screen.
      */
     suspend fun provision(
@@ -156,7 +156,7 @@ class Provisioner(
         failures: List<String> = emptyList(),
         permissionFailures: List<String> = emptyList(),
         packageOutcomes: List<PackageOutcome> = emptyList(),
-    ) = EnrolmentReport(
+    ) = SetupReport(
         deviceId = DeviceFacts.deviceId(appContext),
         deviceLabel = DeviceLabel.of(DeviceFacts.deviceId(appContext)),
         deploymentId = config?.deploymentId.orEmpty(),
@@ -216,13 +216,13 @@ class Provisioner(
         File(appContext.filesDir, PENDING_BOOTSTRAP).delete()
     }
 
-    fun lastReport(): EnrolmentReport? {
+    fun lastReport(): SetupReport? {
         val file = File(appContext.filesDir, LAST_REPORT)
         if (!file.exists()) return null
-        return runCatching { EnrolmentReport.parse(file.readText()) }.getOrNull()
+        return runCatching { SetupReport.parse(file.readText()) }.getOrNull()
     }
 
-    private fun saveLastReport(report: EnrolmentReport) {
+    private fun saveLastReport(report: SetupReport) {
         File(appContext.filesDir, LAST_REPORT).writeText(report.encode())
     }
 

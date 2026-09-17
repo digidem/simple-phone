@@ -46,7 +46,7 @@ object KioskUpdate {
         try {
             val url = serverUrl + KioskConfig.DPC_PATH
             Http.download(url, apk).getOrElse {
-                return "Could not download the Field Kiosk update from $url: ${it.message}"
+                return "Could not download the Simple Phone update from $url: ${it.message}"
             }
 
             // Our own certificate, not one from the config: this is the install

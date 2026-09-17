@@ -48,7 +48,7 @@ import com.google.zxing.NotFoundException
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import org.awana.kiosk.policy.DevicePolicy
-import org.awana.kiosk.shared.EnrolmentCode
+import org.awana.kiosk.shared.SetupCode
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
@@ -65,7 +65,7 @@ import java.util.concurrent.atomic.AtomicReference
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScanScreen(onCode: (EnrolmentCode) -> Unit, onBack: () -> Unit) {
+fun ScanScreen(onCode: (SetupCode) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -108,7 +108,7 @@ fun ScanScreen(onCode: (EnrolmentCode) -> Unit, onBack: () -> Unit) {
 
             Viewfinder(lifecycleOwner) { text ->
                 if (taken) return@Viewfinder
-                val code = EnrolmentCode.parse(text)
+                val code = SetupCode.parse(text)
                 if (code == null) {
                     wrongCode = true
                 } else {

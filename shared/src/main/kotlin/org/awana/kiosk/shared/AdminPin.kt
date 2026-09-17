@@ -7,7 +7,7 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
 /**
- * Hashing and verification for the per-deployment admin PIN. The provision app
+ * Hashing and verification for the per-deployment admin PIN. The setup app
  * hashes; the kiosk verifies. Changing the encoding strands every device
  * already in the field, which is why both sides compile this one file.
  *

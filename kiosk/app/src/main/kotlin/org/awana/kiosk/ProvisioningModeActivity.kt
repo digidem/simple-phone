@@ -9,7 +9,7 @@ import android.os.PersistableBundle
 /**
  * Answers the setup wizard's `GET_PROVISIONING_MODE` from Android 11 onwards.
  *
- * Without it a QR enrolment can stop before the device is ever handed over.
+ * Without it a QR provisioning run can stop before the device is ever handed over.
  * There is nothing to ask the trainer — every device this app is scanned onto is
  * fully managed — so it answers and closes without drawing anything.
  *

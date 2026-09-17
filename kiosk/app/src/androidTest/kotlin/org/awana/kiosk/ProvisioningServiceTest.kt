@@ -78,7 +78,7 @@ class ProvisioningServiceTest {
 
         ProvisioningService.start(context, bootstrapFor(running))
 
-        await("no enrolment report reached the server") { running.reports.isNotEmpty() }
+        await("no setup report reached the server") { running.reports.isNotEmpty() }
         val report = running.reports.single()
         assertTrue("the service reported failures: ${report.failures}", report.failures.isEmpty())
         assertTrue(
@@ -130,7 +130,7 @@ class ProvisioningServiceTest {
         return running
     }
 
-    /** The hash is over the bytes as served, which is what the trainer's app publishes. */
+    /** The hash is over the bytes as served, which is what the setup app publishes. */
     private fun bootstrapFor(running: DeploymentServer) = ProvisioningBootstrap(
         running.url,
         Digests.sha256Hex(running.config!!.toByteArray()),

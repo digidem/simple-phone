@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Two Android apps in one Gradle build: **Field Kiosk** (`org.awana.kiosk`), a
+Two Android apps in one Gradle build: **Simple Phone** (`org.awana.kiosk`), a
 Device Owner app that locks a budget phone down to a handful of apps for
-non-technical, sometimes non-literate users, and **Field Kiosk Setup**
-(`org.awana.provision`), the trainer's app that provisions those devices over a
-local hotspot. `shared/` holds the wire protocol both compile.
+non-technical, sometimes non-literate users, and **Phone Setup**
+(`org.awana.kiosk.setup`), the trainer's app, which provisions those phones over
+a local hotspot. `shared/` holds the wire protocol both compile.
 
 **Read [CONTRIBUTING.md](CONTRIBUTING.md).** It has the layout, the build and
 test commands, the architecture, and the list of things that look like bugs but

@@ -10,7 +10,7 @@ plugins {
 /**
  * Release signing comes from a gitignored `keystore.properties`. Without it the
  * release build falls back to debug signing so a fresh clone still builds —
- * `buildVariant` in the enrolment report is what tells you which key you
+ * `buildVariant` in the setup report is what tells you which key you
  * actually got.
  */
 val keystoreProperties = Properties().apply {
@@ -41,7 +41,7 @@ android {
                 keyPassword = keystoreProperties.getProperty("keyPassword")
                 // Signing lineage from the first release, so key rotation under
                 // APK Signature Scheme v3 stays possible. A lost kiosk key means
-                // no enrolled device can ever receive a DPC update again.
+                // no phone in the field can ever receive a DPC update again.
                 enableV1Signing = false
                 enableV2Signing = true
                 enableV3Signing = true
@@ -77,7 +77,7 @@ android {
 
     sourceSets {
         // The golden provisioning payload lives at the repository root: the
-        // :provision unit tests generate it and this test suite parses it.
+        // :setup unit tests generate it and this test suite parses it.
         // The sample APK is built by :sample for the end-to-end test to install.
         getByName("androidTest").assets.srcDirs(
             rootProject.file("testdata"),

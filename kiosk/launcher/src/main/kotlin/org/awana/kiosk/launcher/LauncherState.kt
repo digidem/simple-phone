@@ -13,7 +13,7 @@ import org.awana.kiosk.shared.LauncherRole
  * Works out which of the four home screens this phone should be showing.
  *
  * An empty app list on its own cannot tell the three failure cases apart, so
- * this reads the last enrolment report as well as the config: a phone with no
+ * this reads the last setup report as well as the config: a phone with no
  * config that recorded a failure is a setup that broke, and one that recorded
  * nothing was never set up at all.
  */

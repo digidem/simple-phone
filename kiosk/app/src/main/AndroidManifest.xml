@@ -38,7 +38,7 @@
         -->
         <!--
           From Android 11 the setup wizard asks the DPC for these two before it
-          will finish a QR enrolment. Both are answered without any UI; the
+          will finish a QR provisioning run. Both are answered without any UI; the
           BIND_DEVICE_ADMIN permission is what keeps other apps from starting
           them, since they have to be exported for the wizard to reach them.
         -->

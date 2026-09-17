@@ -12,7 +12,7 @@ import org.junit.runner.RunWith
 
 /**
  * From Android 11 the setup wizard asks the DPC to handle these two actions and
- * a QR enrolment can stop without them. Nothing in the instrumented suite
+ * a QR provisioning run can stop without them. Nothing in the instrumented suite
  * exercises the wizard itself, so what is checked here is what the wizard looks
  * for: that this package answers both, and behind the permission that keeps any
  * other app from starting them.

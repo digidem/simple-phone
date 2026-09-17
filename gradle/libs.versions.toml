@@ -34,10 +34,10 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 
 # Five static endpoints. NanoHTTPD is one class to subclass; Ktor would be
 # several megabytes of engine for the same job. The kiosk's end-to-end test uses
-# it too, standing in for the provision app's server.
+# it too, standing in for the setup app's server.
 nanohttpd = { module = "org.nanohttpd:nanohttpd", version.ref = "nanohttpd" }
 # core only: the android-integration artifact pulls in a camera scanner this
-# app has no use for. The provision app renders bitmaps from the BitMatrix
+# app has no use for. The setup app renders bitmaps from the BitMatrix
 # directly; the kiosk decodes frames CameraX hands it.
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 
