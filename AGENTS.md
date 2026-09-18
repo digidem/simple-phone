@@ -12,12 +12,12 @@ are deliberate. What follows is only what an agent needs on top of it.
 
 ## Do not grow logic into the receiver
 
-`onProfileProvisioningComplete` is a thin wrapper over
-`Provisioner.provision(config)` and nothing else. That is the seam the whole
-provisioning path is tested through: tests call `provision()` directly with a
-synthesised config, so download, verify, install, apply policy and report all
-run without a camera or a setup wizard. Anything added to the receiver is
-untestable by construction.
+`onProfileProvisioningComplete` and `PolicyComplianceActivity` hand off to
+`ProvisioningService`, which calls `Provisioner.provision(config)`, and do
+nothing else. That is the seam the whole provisioning path is tested through:
+tests call `provision()` directly with a synthesised config, so download,
+verify, install, apply policy and report all run without a camera or a setup
+wizard. Anything added to either entry point is untestable by construction.
 
 ## Use both emulators
 

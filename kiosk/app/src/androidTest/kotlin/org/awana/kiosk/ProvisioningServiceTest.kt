@@ -7,8 +7,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import org.awana.kiosk.policy.ConfigStore
 import org.awana.kiosk.policy.DevicePolicy
 import org.awana.kiosk.policy.Provisioner
+import org.awana.kiosk.policy.UpdateProgress
+import org.awana.kiosk.policy.UpdateState
 import org.awana.kiosk.shared.Certificates
 import org.awana.kiosk.shared.Digests
 import org.awana.kiosk.shared.PackageSpec
@@ -121,6 +124,39 @@ class ProvisioningServiceTest {
             "a report was sent to a server the config could not be trusted from",
             running.reports.isEmpty(),
         )
+    }
+
+    @Test
+    fun insideTheSetupWizardEachStepIsShownAndTheOutcomeReleasesTheWizard() {
+        val running = serve()
+        running.config = TestConfigs.withServer(running.url, emptyList()).encode()
+        UpdateProgress.clear()
+
+        // What PolicyComplianceActivity starts, and then waits on.
+        ProvisioningService.startInSetupWizard(context, bootstrapFor(running))
+
+        await("the setup never reported an outcome for the wizard") { UpdateProgress.state.value.finished }
+        val outcome = UpdateProgress.state.value
+        assertTrue("setup failed inside the wizard: $outcome", outcome is UpdateState.Done)
+        assertTrue("the report never reached the trainer's phone", running.reports.isNotEmpty())
+        UpdateProgress.clear()
+    }
+
+    @Test
+    fun aLateCompletionBroadcastDoesNotSetThePhoneUpAgain() {
+        val running = serve()
+        running.config = TestConfigs.withServer(running.url, emptyList()).encode()
+        val store = ConfigStore(context)
+        store.save(TestConfigs.withServer(running.url, emptyList()))
+        try {
+            ProvisioningService.startAfterCompletion(context, bootstrapFor(running))
+
+            // Nothing to wait for but the absence of a fetch; give it the time one takes.
+            Thread.sleep(3_000)
+            assertTrue("the config was fetched again", running.fetched.none { it == "/config.json" })
+        } finally {
+            store.clear()
+        }
     }
 
     private fun serve(): DeploymentServer {

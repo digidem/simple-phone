@@ -233,14 +233,18 @@ thin wrapper over `Provisioner.provision(config)` and nothing else.** Tests call
 fetch, verify, install, pre-grant, apply policy, join networks, report — runs
 without a camera or a setup wizard. Do not grow logic into the receiver.
 
-What the receiver does is read a bootstrap out of the provisioning extras and
-hand it to a foreground service, because a receiver's process can be killed the
-moment `onReceive` returns and the payload includes a download that can run to
-hundreds of megabytes. Two further activities exist only for the platform's
-provisioning handshake, and neither draws anything: `ACTION_GET_PROVISIONING_MODE`
-answers that this app wants a fully managed device and hands the admin extras
-back, and `ACTION_ADMIN_POLICY_COMPLIANCE` returns at once, because the policy is
-applied by the service rather than in front of the wizard.
+Setup is started from `ACTION_ADMIN_POLICY_COMPLIANCE`, not from the
+receiver. From Android 12 that activity is the one point a device owner is
+sure to get before the setup wizard ends — "DPC setup can't be started after
+the end of the setup wizard" — and the completion broadcast never arrived at
+all on a Galaxy A17 on Android 16. `PolicyComplianceActivity` hands the
+bootstrap to a foreground service, shows its steps, and holds the wizard until
+it is done; the wizard then brings up the kiosk as HOME. The receiver is kept
+as a fallback for a wizard that does run it, and the service ignores it once
+setup has run. Both hand off to a service because the payload is a download of
+hundreds of megabytes that has to outlive whoever started it.
+`ACTION_GET_PROVISIONING_MODE` draws nothing: it answers that this app wants a
+fully managed device and hands the admin extras back.
 
 `DevicePolicy` resolves its own admin `ComponentName` by querying
 `PackageManager` for the receiver in this package, so `:kiosk:policy` needs no
@@ -394,11 +398,15 @@ setup wizard insists on internet so it can update the platform's provisioning
 role holder. The hotspot has none, so the wizard says it couldn't connect and
 returns to the scanner.
 
-**The bootstrap is kept at every step of the handshake, not only read in the
-receiver.** `ProvisioningModeActivity` and `PolicyComplianceActivity` are handed
-the admin extras too, and write the bootstrap where `pendingBootstrap` finds
-it. If the completion broadcast arrives without them, the service falls back
+**The bootstrap is kept at every step of the handshake.** Each step of the
+wizard is handed the admin extras, and writes the bootstrap where
+`pendingBootstrap` finds it, so a step that arrives without them falls back
 to that copy rather than stopping silently.
+
+**A new phone shows a progress screen inside the setup wizard.** It is the
+policy-compliance step, held open until setup finishes. It always returns OK,
+even when setup failed: the failure is recorded for the launcher to offer
+again, which beats a wizard left half finished.
 
 **The QR carries a bootstrap, not the config.** `onProfileProvisioningComplete`
 reads only a server URL and a SHA-256; `ConfigFetch` then downloads

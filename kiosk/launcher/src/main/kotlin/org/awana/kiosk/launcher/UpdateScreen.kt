@@ -203,6 +203,26 @@ private fun Shell(title: String, onBack: (() -> Unit)?, content: @Composable () 
  * driving them directly is the only way to see a finished update without a
  * camera and a trainer.
  */
+/** A new phone setting itself up, shown inside the setup wizard until it is done. */
+@Composable
+fun SetupWorking(state: UpdateState) {
+    Shell(stringResource(R.string.setup_title), onBack = null) {
+        CircularProgressIndicator(modifier = Modifier.padding(top = 48.dp))
+        Text(
+            text = state.describe(),
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.testTag(TAG_UPDATE_STEP),
+        )
+        Text(
+            text = stringResource(R.string.update_hold_on),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
 @Composable
 fun UpdateWorking(what: String, onBack: (() -> Unit)?) {
     Shell(stringResource(R.string.admin_update), onBack) {

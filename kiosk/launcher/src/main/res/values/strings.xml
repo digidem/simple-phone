@@ -121,6 +121,7 @@
     <string name="update_installing">Installing %1$s (%2$d of %3$d)…</string>
     <string name="update_applying">Applying the settings…</string>
     <string name="update_kiosk">Updating Simple Phone itself. The phone will go back to the home screen on its own.</string>
+    <string name="setup_title">Setting up this phone</string>
     <string name="update_hold_on">Keep this phone near the trainer\'s phone until it finishes.</string>
     <string name="update_done">This phone is up to date</string>
     <string name="update_done_nothing">Nothing needed changing. This phone was already up to date.</string>

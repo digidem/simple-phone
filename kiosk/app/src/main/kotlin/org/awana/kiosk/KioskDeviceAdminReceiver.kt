@@ -26,8 +26,10 @@ class KioskDeviceAdminReceiver : DeviceAdminReceiver() {
         // A receiver's process may be killed once onReceive returns, so the
         // work is handed to a foreground service rather than a bare coroutine.
         // With no bootstrap here the service uses the one the handshake kept.
+        // On current Android the compliance activity has normally done the
+        // work already, and this is only the fallback.
         try {
-            ProvisioningService.start(context, bootstrap)
+            ProvisioningService.startAfterCompletion(context, bootstrap)
         } catch (e: Exception) {
             Telemetry.report(TAG, "Could not start provisioning", error = e)
         }

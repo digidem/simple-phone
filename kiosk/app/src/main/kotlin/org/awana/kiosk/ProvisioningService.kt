@@ -13,6 +13,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import org.awana.kiosk.policy.ConfigFetch
+import org.awana.kiosk.policy.ConfigStore
 import org.awana.kiosk.policy.DevicePolicy
 import org.awana.kiosk.policy.Provisioning
 import org.awana.kiosk.policy.UpdateProgress
@@ -46,9 +47,34 @@ class ProvisioningService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Before any early return: a service started with startForegroundService
+        // that stops without this takes the whole process down.
+        startForeground()
         if (intent?.action == Provisioning.ACTION_APPLY_UPDATE) {
             applyStagedUpdate(startId)
             return START_NOT_STICKY
+        }
+
+        val origin = intent?.getStringExtra(EXTRA_ORIGIN)
+        // The compliance activity has usually done the work by the time the
+        // completion broadcast arrives, where it arrives at all.
+        if (origin == ORIGIN_COMPLETION && (running || ConfigStore(this).load() != null)) {
+            Telemetry.info(TAG, "Completion broadcast after setup already ran; nothing to do")
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        if (running && origin != null) {
+            Telemetry.warn(TAG, "Setup is already running; ignoring a second start from the $origin")
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        val inWizard = origin == ORIGIN_WIZARD
+        // Inside the wizard the compliance activity shows the steps and the
+        // wizard brings up HOME itself when it ends.
+        val onStep: (UpdateState) -> Unit = if (inWizard) UpdateProgress::report else { _ -> }
+        val finish = { outcome: UpdateState ->
+            onStep(outcome)
+            if (!inWizard) launchHome()
         }
 
         val provisioner = Provisioner(applicationContext)
@@ -65,18 +91,21 @@ class ProvisioningService : Service() {
         }
         if (bootstrap == null) {
             Telemetry.report(TAG, "Started without a usable bootstrap", context = this)
+            onStep(UpdateState.Failed(getString(R.string.provisioning_config_failed)))
             stopSelf(startId)
             return START_NOT_STICKY
         }
         Telemetry.info(
             TAG,
             "Provisioning from ${bootstrap.serverUrl} " +
-                "(bootstrap ${if (serverUrl != null) "from the intent" else "kept earlier"})",
+                "(bootstrap ${if (serverUrl != null) "from the intent" else "kept earlier"}, " +
+                "started by ${origin ?: "the launcher"})",
         )
 
-        startForeground()
+        running = true
 
         scope.launch {
+            onStep(UpdateState.FetchingSettings)
             val staged = File(cacheDir, CONFIG_FILE)
             val config = ConfigFetch.fetch(bootstrap, staged).getOrElse { error ->
                 // The config never arrived or did not match its hash, so there
@@ -88,18 +117,17 @@ class ProvisioningService : Service() {
                     extras = mapOf("serverUrl" to bootstrap.serverUrl),
                     context = this@ProvisioningService,
                 )
-                provisioner.recordBootstrapFailure(
-                    error.message ?: getString(R.string.provisioning_config_failed),
-                    bootstrap,
-                )
-                launchHome()
+                val reason = error.message ?: getString(R.string.provisioning_config_failed)
+                running = false
+                provisioner.recordBootstrapFailure(reason, bootstrap)
+                finish(UpdateState.Failed(reason))
                 Telemetry.flush()
                 stopSelf(startId)
                 return@launch
             }
             staged.delete()
 
-            runCatching { provisioner.provision(config) }
+            val outcome = runCatching { provisioner.provision(config, onStep) }
                 .onSuccess {
                     val failures = it.report.failures + it.report.permissionFailures
                     Telemetry.report(
@@ -119,7 +147,13 @@ class ProvisioningService : Service() {
                     Telemetry.report(TAG, "Provisioning threw", error = it, context = this@ProvisioningService)
                 }
 
-            launchHome()
+            running = false
+            finish(
+                outcome.fold(
+                    { UpdateState.Done(it.report) },
+                    { UpdateState.Failed(it.message ?: getString(R.string.provisioning_config_failed)) },
+                ),
+            )
             Telemetry.flush()
             stopSelf(startId)
         }
@@ -144,7 +178,6 @@ class ProvisioningService : Service() {
             return
         }
 
-        startForeground()
         scope.launch {
             val outcome = runCatching {
                 Provisioner(applicationContext).provision(config) { UpdateProgress.report(it) }
@@ -255,14 +288,33 @@ class ProvisioningService : Service() {
         private const val EXTRA_SERVER_URL = "serverUrl"
         private const val EXTRA_CONFIG_SHA256 = "configSha256"
         private const val CONFIG_FILE = "deployment-config.json"
+        private const val EXTRA_ORIGIN = "origin"
+        private const val ORIGIN_WIZARD = "setup wizard"
+        private const val ORIGIN_COMPLETION = "completion broadcast"
+
+        /** One setup at a time: the wizard and the broadcast can both ask. */
+        @Volatile
+        private var running = false
 
         /** A null [bootstrap] runs the one [Provisioner.pendingBootstrap] kept. */
-        fun start(context: Context, bootstrap: ProvisioningBootstrap?) {
+        fun start(context: Context, bootstrap: ProvisioningBootstrap?) =
+            start(context, bootstrap, origin = null)
+
+        /** Reports each step to [UpdateProgress] and leaves HOME to the wizard. */
+        fun startInSetupWizard(context: Context, bootstrap: ProvisioningBootstrap) =
+            start(context, bootstrap, ORIGIN_WIZARD)
+
+        /** Does nothing when the compliance activity has already set the phone up. */
+        fun startAfterCompletion(context: Context, bootstrap: ProvisioningBootstrap?) =
+            start(context, bootstrap, ORIGIN_COMPLETION)
+
+        private fun start(context: Context, bootstrap: ProvisioningBootstrap?, origin: String?) {
             val intent = Intent(context, ProvisioningService::class.java)
             bootstrap?.let {
                 intent.putExtra(EXTRA_SERVER_URL, it.serverUrl)
                     .putExtra(EXTRA_CONFIG_SHA256, it.configSha256)
             }
+            origin?.let { intent.putExtra(EXTRA_ORIGIN, it) }
             context.startForegroundService(intent)
         }
     }
