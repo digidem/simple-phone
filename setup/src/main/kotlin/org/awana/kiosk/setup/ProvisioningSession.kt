@@ -276,10 +276,15 @@ class ProvisioningSession(context: Context) {
     /** The field phone may never get online itself; this phone often is. */
     private fun noteReport(address: String, report: SetupReport) {
         val failures = report.failures + report.permissionFailures
+        // A clean setup is a log line: as an issue it would alert on every phone.
+        if (failures.isEmpty()) {
+            Telemetry.info(TAG, "Setup report from ${report.deviceLabel} (${report.manufacturer} ${report.model}): no failures")
+            return
+        }
         Telemetry.report(
             TAG,
             "Setup report from ${report.deviceLabel}: ${failures.size} failure(s)",
-            level = if (failures.isEmpty()) SentryLevel.INFO else SentryLevel.WARNING,
+            level = SentryLevel.WARNING,
             extras = mapOf(
                 "address" to address,
                 "device" to "${report.manufacturer} ${report.model}",

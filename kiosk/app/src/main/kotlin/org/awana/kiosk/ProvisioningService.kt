@@ -130,10 +130,15 @@ class ProvisioningService : Service() {
             val outcome = runCatching { provisioner.provision(config, onStep) }
                 .onSuccess {
                     val failures = it.report.failures + it.report.permissionFailures
+                    // A clean setup is a log line: as an issue it would alert on every phone.
+                    if (failures.isEmpty()) {
+                        Telemetry.info(TAG, "Provisioning finished, report delivered=${it.reportDelivered}")
+                        return@onSuccess
+                    }
                     Telemetry.report(
                         TAG,
                         "Provisioning finished with ${failures.size} failure(s)",
-                        level = if (failures.isEmpty()) SentryLevel.INFO else SentryLevel.WARNING,
+                        level = SentryLevel.WARNING,
                         extras = mapOf(
                             "failures" to failures,
                             "reportDelivered" to it.reportDelivered,
