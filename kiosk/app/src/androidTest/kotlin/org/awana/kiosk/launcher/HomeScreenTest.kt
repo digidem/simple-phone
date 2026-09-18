@@ -3,6 +3,7 @@ package org.awana.kiosk.launcher
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithText
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -68,7 +69,17 @@ class HomeScreenTest {
         onSetUpAgain: () -> Unit = {},
         onRemoveLock: () -> Unit = {},
         onAdminGesture: () -> Unit = {},
-    ) = HomeScreen(state, onLaunch, onSetUpAgain, onRemoveLock, onAdminGesture)
+        onScanCode: () -> Unit = {},
+        onRelock: () -> Unit = {},
+    ) = HomeScreen(
+        state,
+        onLaunch,
+        onSetUpAgain,
+        onRemoveLock,
+        onAdminGesture,
+        onScanCode = onScanCode,
+        onRelock = onRelock,
+    )
 
     @Test
     fun showsTheHeroAndEverySmallApp() {
@@ -136,6 +147,8 @@ class HomeScreenTest {
         compose.onNodeWithTag(TAG_NOT_SET_UP).assertIsDisplayed()
         // Nothing was ever scanned, so there is no bootstrap to re-run.
         compose.onNodeWithTag(TAG_SET_UP_AGAIN).assertDoesNotExist()
+        // The screen tells them to scan, so it has to offer the scanner.
+        compose.onNodeWithTag(TAG_SCAN_CODE).assertIsDisplayed()
         compose.onNodeWithTag(TAG_REMOVE_LOCK).assertIsDisplayed()
     }
 
@@ -150,24 +163,73 @@ class HomeScreenTest {
     }
 
     @Test
-    fun bothRecoveryActionsRunWithoutAPin() {
+    fun everyRecoveryActionRunsWithoutAPin() {
         var setUpAgain = false
+        var scan = false
         var removeLock = false
         compose.setContent {
             KioskTheme {
                 Home(
                     HomeState.SetupUnfinished(canSetUpAgain = true),
                     onSetUpAgain = { setUpAgain = true },
+                    onScanCode = { scan = true },
                     onRemoveLock = { removeLock = true },
                 )
             }
         }
 
         compose.onNodeWithTag(TAG_SET_UP_AGAIN).performClick()
+        compose.onNodeWithTag(TAG_SCAN_CODE).performClick()
         compose.onNodeWithTag(TAG_REMOVE_LOCK).performClick()
+        compose.onNodeWithTag(TAG_REMOVE_LOCK_UNDERSTOOD).performClick()
+        compose.onNodeWithTag(TAG_REMOVE_LOCK_CONFIRM).performClick()
 
         assertEquals(true, setUpAgain)
+        assertEquals(true, scan)
         assertEquals(true, removeLock)
+    }
+
+    @Test
+    fun removingTheLockCannotBeConfirmedWithoutSayingSoIsUnderstood() {
+        var removeLock = false
+        compose.setContent {
+            KioskTheme {
+                Home(HomeState.NotSetUp(canSetUpAgain = false), onRemoveLock = { removeLock = true })
+            }
+        }
+
+        compose.onNodeWithTag(TAG_REMOVE_LOCK).performClick()
+        compose.onNodeWithTag(TAG_REMOVE_LOCK_DIALOG).assertIsDisplayed()
+        compose.onNodeWithTag(TAG_REMOVE_LOCK_CONFIRM).assertIsNotEnabled()
+        compose.onNodeWithTag(TAG_REMOVE_LOCK_CONFIRM).performClick()
+
+        assertEquals("one tap must not remove the lock", false, removeLock)
+    }
+
+    @Test
+    fun anUnlockedPhoneSaysSoAndLocksAgainFromTheHomeScreen() {
+        var relocked = false
+        compose.setContent {
+            KioskTheme {
+                Home(HomeState.Unlocked(canOpenOtherApps = true), onRelock = { relocked = true })
+            }
+        }
+
+        compose.onNodeWithTag(TAG_UNLOCKED).assertIsDisplayed()
+        compose.onNodeWithTag(TAG_OPEN_OTHER_APPS).assertIsDisplayed()
+        compose.onNodeWithTag(TAG_LOCK_AGAIN).performClick()
+
+        assertEquals(true, relocked)
+    }
+
+    @Test
+    fun aPhoneWhoseLockWasRemovedOffersNothingThatNeedsTheLock() {
+        compose.setContent { KioskTheme { Home(HomeState.LockRemoved) } }
+
+        compose.onNodeWithTag(TAG_LOCK_REMOVED).assertIsDisplayed()
+        compose.onNodeWithTag(TAG_CHOOSE_HOME).assertIsDisplayed()
+        compose.onNodeWithTag(TAG_SCAN_CODE).assertDoesNotExist()
+        compose.onNodeWithTag(TAG_REMOVE_LOCK).assertDoesNotExist()
     }
 
     @Test

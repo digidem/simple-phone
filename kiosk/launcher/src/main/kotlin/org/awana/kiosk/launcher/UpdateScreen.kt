@@ -20,6 +20,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -55,7 +57,15 @@ import org.awana.kiosk.shared.KioskConfig
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UpdateScreen(onBack: () -> Unit) {
+fun UpdateScreen(onBack: () -> Unit, title: Int = R.string.admin_update) {
+    CompositionLocalProvider(LocalUpdateTitle provides title) { UpdateFlow(onBack) }
+}
+
+/** Setting up a phone from its home screen runs the same flow under its own name. */
+private val LocalUpdateTitle = staticCompositionLocalOf { R.string.admin_update }
+
+@Composable
+private fun UpdateFlow(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val progress by UpdateProgress.state.collectAsState()
@@ -225,7 +235,7 @@ fun SetupWorking(state: UpdateState) {
 
 @Composable
 fun UpdateWorking(what: String, onBack: (() -> Unit)?) {
-    Shell(stringResource(R.string.admin_update), onBack) {
+    Shell(stringResource(LocalUpdateTitle.current), onBack) {
         CircularProgressIndicator(modifier = Modifier.padding(top = 48.dp))
         Text(
             text = what,
@@ -249,7 +259,7 @@ fun UpdateFinished(report: SetupReport, onBack: () -> Unit) {
     }
     val current = report.packageOutcomes.count { it.result == InstallResult.AlreadyCurrent }
 
-    Shell(stringResource(R.string.admin_update), onBack) {
+    Shell(stringResource(LocalUpdateTitle.current), onBack) {
         Verdict(
             healthy = report.failures.isEmpty(),
             headline = if (report.failures.isEmpty()) {
@@ -276,7 +286,7 @@ fun UpdateFinished(report: SetupReport, onBack: () -> Unit) {
 
 @Composable
 fun UpdateRefused(message: String, onBack: () -> Unit) {
-    Shell(stringResource(R.string.admin_update), onBack) {
+    Shell(stringResource(LocalUpdateTitle.current), onBack) {
         Verdict(
             healthy = false,
             headline = stringResource(R.string.update_problem),

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import org.awana.kiosk.policy.ConfigStore
 import org.awana.kiosk.policy.DevicePolicy
+import org.awana.kiosk.policy.PhoneLock
 import org.awana.kiosk.policy.Reporter
 import org.awana.kiosk.shared.Telemetry
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,8 @@ class BootReceiver : BroadcastReceiver() {
         val policy = DevicePolicy(appContext)
         when {
             config == null -> Log.i(TAG, "No config; device is not provisioned")
+            // Someone unlocked it to fix something; a restart must not undo that.
+            PhoneLock.isUnlocked(appContext) -> Telemetry.info(TAG, "Unlocked by an admin; left unlocked")
             !policy.isDeviceOwner -> Telemetry.warn(TAG, "Not device owner at boot; policy not re-applied")
             else -> {
                 val result = policy.applyAll(config)

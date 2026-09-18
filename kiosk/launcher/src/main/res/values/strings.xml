@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="launcher_not_set_up">This phone has not been set up</string>
-    <string name="launcher_not_set_up_body">Scan a setup code from the trainer\'s phone to finish.</string>
+    <string name="launcher_not_set_up_body">Scan the setup code on the trainer\'s phone to finish setting it up.</string>
     <string name="launcher_setup_unfinished">Setting up this phone did not finish</string>
     <string name="launcher_setup_unfinished_body">It could not get its settings from the trainer\'s phone.</string>
     <string name="launcher_no_apps">No apps are showing</string>
@@ -10,6 +10,15 @@
     <string name="launcher_set_up_again">Set this phone up again</string>
     <string name="launcher_set_up">Set this phone up</string>
     <string name="launcher_remove_lock">Remove the lock</string>
+    <string name="launcher_scan">Scan a setup code</string>
+    <string name="launcher_unlocked">This phone is unlocked</string>
+    <string name="launcher_unlocked_body">Everything on it can be used and changed, including settings and installing apps. Lock it again when you have finished.</string>
+    <string name="launcher_lock_again">Lock the phone again</string>
+    <string name="launcher_open_other_apps">Open the phone\'s other apps</string>
+    <string name="launcher_lock_problems">The phone is locked, but not everything could be put back:\n\n%1$s</string>
+    <string name="launcher_lock_removed">The lock has been removed</string>
+    <string name="launcher_lock_removed_body">This is a normal phone now. Simple Phone no longer controls it, and it can be uninstalled.</string>
+    <string name="launcher_choose_home">Choose a home screen</string>
     <string name="launcher_test_setup">Set up for testing</string>
 
     <string name="test_setup_title">Set up for testing</string>
@@ -26,7 +35,8 @@
     <string name="action_back">Back</string>
     <string name="action_save">Save</string>
     <string name="action_install">Install</string>
-    <string name="action_unlock">Unlock for 10 minutes</string>
+    <string name="action_unlock">Unlock</string>
+    <string name="action_allow">Allow</string>
     <string name="action_unlock_admin">Unlock</string>
     <string name="action_unprovision">Remove the lock</string>
 
@@ -46,7 +56,7 @@
     <string name="admin_change">Change this phone</string>
     <string name="admin_change_body">Apps on the home screen, Wi-Fi, admin PIN</string>
     <string name="admin_wrong">Something is wrong</string>
-    <string name="admin_wrong_body">Re-apply the lock, install an app, unlock temporarily, remove the lock</string>
+    <string name="admin_wrong_body">Re-apply the lock, install an app, unlock, remove the lock</string>
     <string name="admin_doors_hint">Recovery lives behind one door so a trainer looking for Wi-Fi never lands next to “Remove the lock” by accident.</string>
 
     <string name="admin_visible_apps">Apps shown on the home screen</string>
@@ -62,11 +72,15 @@
     <string name="admin_reapply_policy_body">If part of the phone stopped behaving as it should</string>
     <string name="admin_install_url">Install an app from a web address</string>
     <string name="admin_install_url_body">Needs the phone to be on a network</string>
-    <string name="admin_unlock_temporarily">Unlock this phone for 10 minutes</string>
-    <string name="admin_unlock_temporarily_body">Locks itself again afterwards, so it cannot be left open</string>
+    <string name="admin_unlock">Unlock this phone</string>
+    <string name="admin_unlock_body">Lifts the lock until you lock it again, to fix something on the phone</string>
+    <string name="admin_lock_again">Lock this phone again</string>
+    <string name="admin_lock_again_body">Puts the whole lock back</string>
+    <string name="admin_install_file">Install an app from a file on this phone</string>
+    <string name="admin_install_file_body">An APK file already on the phone. No network needed</string>
     <string name="admin_last_resort">Last resort</string>
-    <string name="admin_unprovision">Remove the lock from this phone</string>
-    <string name="admin_unprovision_body">Turns it back into a normal phone. Cannot be undone.</string>
+    <string name="admin_unprovision">Remove the lock permanently</string>
+    <string name="admin_unprovision_body">Turns it back into a normal phone. It cannot be locked again without erasing it.</string>
 
     <string name="about_healthy">This phone is set up correctly</string>
     <string name="about_healthy_body">Everything installed, and the lock is on.</string>
@@ -88,8 +102,12 @@
     <string name="admin_reapply_partial">Some settings could not be applied: %1$s</string>
     <string name="admin_unprovision_failed">The lock could not be removed from this device. Erase the device and set it up again from the trainer\'s phone.</string>
 
-    <string name="admin_unlock_explain">The home screen lock will be turned off so you can use the rest of the phone. It will turn itself back on after 10 minutes, so the phone cannot be left unlocked by accident.</string>
-    <string name="admin_unprovision_explain">It becomes a normal Android phone. The home screen lock goes, apps can be uninstalled again, and settings are no longer protected.\n\nThis cannot be undone. Putting the lock back means erasing the phone completely and setting it up again from the trainer\'s phone.</string>
+    <string name="admin_unlock_explain">Everything on the phone can be used and changed: settings, other apps, installing and removing apps.\n\nIt stays unlocked, even after a restart, until someone taps \"Lock the phone again\" on the home screen. Do not hand it back to its user unlocked.</string>
+    <string name="remove_lock_title">Remove the lock for good?</string>
+    <string name="remove_lock_body">This turns the phone back into a normal Android phone. The home screen lock and all its protections go, the deployment\'s apps can be uninstalled, and Simple Phone stops managing the phone.\n\nIt cannot be locked again. The only way back is to erase the phone completely and set it up again from the trainer\'s phone.</string>
+    <string name="remove_lock_unlock_instead">To fix something and lock the phone again afterwards, use \"Unlock this phone\" instead.</string>
+    <string name="remove_lock_understand">I understand this cannot be undone</string>
+    <string name="remove_lock_confirm">Remove the lock</string>
 
     <string name="info_device_label">Device code</string>
     <string name="info_android">Android version</string>
@@ -106,6 +124,15 @@
     <string name="wifi_added">Added %1$s.</string>
     <string name="wifi_add_failed">The network could not be added. This only works when Simple Phone is the device owner.</string>
 
+    <string name="install_file_explain">Choose an APK file that is already on this phone, for example in Downloads. An app this phone already has must be signed with the same key as before, or it will be refused. Updating Simple Phone itself restarts this screen.</string>
+    <string name="install_file_choose">Choose a file</string>
+    <string name="install_file_allow_title">Let people use %1$s?</string>
+    <string name="install_file_allow_body">%1$s is installed, but the lock only lets this phone\'s apps open. Allow it to add it to them: it will open under the lock, appear on the home screen and be protected from uninstalling.\n\nAn update from the trainer\'s phone replaces this phone\'s apps with the deployment\'s list.</string>
+    <string name="admin_other_apps">Other apps on this phone</string>
+    <string name="admin_other_apps_body">Installed, but the lock does not let people open them.</string>
+    <string name="sideload_ok_not_allowed">%1$s was installed. The lock will not let people open it until it is allowed under \"Apps shown on the home screen\".</string>
+    <string name="admin_allowed">%1$s can now be opened and is on the home screen.</string>
+    <string name="setup_scan_title">Set up this phone</string>
     <string name="install_url_explain">The device must be connected to a network for this. The app you install must be signed with the same key as the one recorded for it, or it will be refused.</string>
     <string name="install_url_label">Web address of the APK file</string>
     <string name="install_package_label">App package name (for example org.example.app)</string>

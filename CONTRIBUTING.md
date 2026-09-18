@@ -200,8 +200,7 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 
 A crash aborts every test after it, so the run reports far fewer tests than it
 should. The same NPE also surfaces as an ordinary failure of
-`LockTaskTest.aTimedBreakLocksTheDeviceAgainWhenItExpires` in whole-suite runs,
-where the relock fires the HOME intent — same call, same null stack. Neither is
+`LockTaskTest.recentsIsNotReachable` in whole-suite runs — same null stack. Neither is
 ours: both reproduce on commits predating the code under review, on a freshly
 booted emulator, with an unmodified worktree — check that before believing a
 change caused it. It is state-dependent in a way that has not
@@ -337,10 +336,9 @@ reboot without the app running, but lock task engagement does not.
 
 **`LauncherActivity.onResume` takes the lock back.** `lockTaskMode="if_whitelisted"`
 only fires when the activity *starts*, and the launcher is `singleInstance`, so
-a resume after a crash gets no such call. It is skipped while
-`LockTaskBreakService.running`, or returning home during a break would cut short
-the ten minutes a trainer asked for, and skipped unless this package is actually
-on the allowlist — `startLockTask` from a package that is not asks the user to
+a resume after a crash gets no such call. It is skipped while an admin has the
+phone unlocked, or returning home would undo what they deliberately did, and
+skipped unless this package is actually on the allowlist — `startLockTask` from a package that is not asks the user to
 confirm screen pinning, which is worse than doing nothing.
 
 **The kiosk replaces itself, last, and only on a strictly newer version.**
@@ -509,11 +507,33 @@ and a wallpaper picker are each either dead weight or an escape route. It loads
 its app list off the main thread and rasterises icons once, rather than doing
 disk and `PackageManager` work during composition.
 
-**The launcher's recovery buttons have no PIN gate.** "Set this phone up again"
-and "Remove the lock" appear only when there is no config — and with no config
-there is no `adminPinHash`, so `PinEntryScreen` could never open. Without them
-such a phone needs ADB or a factory reset. There is also nothing on it yet to
-protect, and it is still in the deployer's hands.
+**The launcher's recovery buttons have no PIN gate.** "Scan a setup code",
+"Set this phone up again" and "Remove the lock" appear only when there is no
+config — and with no config there is no `adminPinHash`, so `PinEntryScreen`
+could never open. Without them such a phone needs ADB or a factory reset. There
+is also nothing on it yet to protect, and it is still in the deployer's hands.
+Scanning goes through the same flow as updating a phone in service, so the code
+is still checked against this app's signing key before the phone does anything.
+
+**Unlocking keeps device ownership; removing the lock gives it up.** Android
+only hands device ownership to an app during the setup of a factory-reset
+phone, so anything that clears it is permanent. `PhoneLock.unlock` lifts
+everything the lock applies — lock task, restrictions, uninstall and
+force-stop protection — and keeps ownership and HOME, so `PhoneLock.lock` puts
+it all back from the config on the phone, with no trainer's phone and no
+network. It is recorded on disk and survives a reboot: someone fixing a phone
+may need to restart it, and the boot receiver must not lock it under them. The
+home screen says it is unlocked for as long as it is, so a phone left that way
+is noticed. Removal asks for a ticked "I understand" before its button works,
+and afterwards the kiosk disables its own HOME activity so the phone's launcher
+comes back; `applyHome` turns it on again, which only a fresh setup reaches.
+
+**An app the deployment does not list can be let through from the admin
+screen.** The lock task allowlist is the config's packages, so an app installed
+from a file or while unlocked stays unopenable until `LocalApps.allow` adds it
+to the config on the phone, with the signing key it has now. The next update
+from the trainer's phone replaces that config, and with it anything added this
+way.
 
 **A failed provisioning attempt keeps its bootstrap.** The server URL and config
 hash arrive once, through the setup wizard, so `Provisioner.recordBootstrapFailure`
@@ -551,9 +571,9 @@ ZXing `core` alone for QR encoding, kotlinx-serialization for the wire format,
 and the platform's `PBKDF2WithHmacSHA256` for the admin PIN. There is nothing
 else on purpose.
 
-**There is no updater yet.** The admin screen can install an app from a URL, and
-running a session again re-provisions a device, but nothing polls for new
-versions. When one is written, the update source belongs behind a small
+**There is no updater that polls.** The admin screen can install an app from a
+file on the phone or from a URL, and scanning the setup code again updates a
+phone, but nothing checks for new versions by itself. When one is written, the update source belongs behind a small
 interface so an offline channel is a cheap addition rather than a rewrite.
 
 The original implementation handoff is kept for the record at

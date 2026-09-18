@@ -1,10 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="lock_break_title">This device is temporarily unlocked</string>
-    <plurals name="lock_break_body">
-        <item quantity="one">It will lock itself again in %d minute.</item>
-        <item quantity="other">It will lock itself again in %d minutes.</item>
-    </plurals>
     <string name="sideload_download_failed">Could not download from %1$s: %2$s</string>
     <string name="sideload_ok">%1$s was installed.</string>
 
@@ -27,4 +22,8 @@
     <string name="unprovision_failed_uninstall_blocked">Some apps still cannot be uninstalled. Erase the device to clear that.</string>
     <string name="unprovision_failed_screen">The lock screen and app permission settings were left as they were. Change them by hand in the device settings.</string>
     <string name="unprovision_failed_device_owner">This app is still in charge of the device. Erase the device to remove it.</string>
+    <string name="lock_no_config">This phone has no settings to lock it with. Set it up from the trainer\'s phone.</string>
+    <string name="sideload_file_unreadable">That file could not be read as an app.</string>
+    <string name="sideload_file_own_older">This file is Simple Phone version %1$s, which is not newer than the one on this phone.</string>
+    <string name="local_app_missing">%1$s is not installed on this phone.</string>
 </resources>

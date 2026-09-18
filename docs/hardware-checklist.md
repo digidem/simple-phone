@@ -193,7 +193,7 @@ phone provisioned by QR has USB debugging off and Developer options unreachable
 behind the lock, so a shell is not available to you in the field however the
 policy is configured. There are two routes and both must work:
 
-1. Admin screen → **Remove the lock from this device**, behind the admin PIN.
+1. Admin screen → **Remove the lock permanently**, behind the admin PIN.
    Check the phone is a normal phone afterwards: a launcher of its own, a
    reachable shade, apps that can be uninstalled.
 2. A factory reset from the phone's own bootloader or recovery menu, for when
@@ -218,7 +218,7 @@ can be days out, and every timestamp it records is wrong with it.
 
 **Record:** how far out it was at each check, whether it corrected itself the
 first time it reached a real network or a SIM, and whether a trainer can fix it
-by hand — from the temporary unlock in the admin screen, or not at all.
+by hand — while the phone is unlocked from the admin screen, or not at all.
 
 ## 13. Peer-to-peer sync over Wi-Fi
 
@@ -249,7 +249,7 @@ unreachable with the shade off.
 
 **Record:** whether the chooser can be reached at all, whether the computer sees
 the phone's storage, and if not, which route is left — the share sheet to
-another app on the device, or the temporary unlock in the admin screen.
+another app on the device, or unlocking the phone from the admin screen.
 
 ## 15. The whole QR provisioning handoff
 

@@ -52,6 +52,9 @@ class Provisioner(
     ): ProvisionResult {
         configStore.save(config)
         clearPendingBootstrap()
+        // The whole policy goes back on below, whatever state the phone was left in.
+        PhoneLock.forgetUnlocked(appContext)
+        PhoneLock.forgetRemoved(appContext)
 
         val before = policy.applyBeforeInstall(config)
         val payload = if (config.serverUrl != null) installPayload(config, onStep) else Payload()

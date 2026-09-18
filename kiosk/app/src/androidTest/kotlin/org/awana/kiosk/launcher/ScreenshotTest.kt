@@ -195,6 +195,17 @@ class ScreenshotTest {
     fun noApps() = shoot("kiosk-06-no-apps", home(HomeState.NoApps))
 
     @Test
+    fun unlocked() = shoot("kiosk-20-unlocked", home(HomeState.Unlocked(canOpenOtherApps = true)))
+
+    @Test
+    fun lockRemoved() = shoot("kiosk-21-lock-removed", home(HomeState.LockRemoved))
+
+    @Test
+    fun removeLockDialog() = shoot("kiosk-22-remove-lock-dialog") {
+        RemoveLockDialog(suggestUnlock = true, onConfirm = {}, onDismiss = {})
+    }
+
+    @Test
     fun pinEntry() = shoot("kiosk-07-pin") {
         PinEntryScreen(onUnlocked = {}, onCancel = {})
     }

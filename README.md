@@ -62,7 +62,9 @@ Set up each field phone:
 
 Leave the two phones near each other while a phone is being set up, and bring a power bank. Running the hotspot and sending a large APK to each phone drains the trainer's phone quickly; that, rather than speed, is what limits how many phones can be done in one go.
 
-Afterwards the phones need nothing from the trainer's phone. A long press on the home screen and the admin PIN open a settings screen where a trainer can change which apps are shown, add a Wi-Fi network, unlock the device for a few minutes, install an app from a URL, or remove the lock entirely.
+Afterwards the phones need nothing from the trainer's phone. A long press on the home screen and the admin PIN open a settings screen where a trainer can change which apps are shown, add a Wi-Fi network, install an app from a file on the phone or from a URL, unlock the phone and lock it again, or remove the lock entirely.
+
+Unlocking is how to fix a phone on the spot, with no trainer's phone and no network: everything on it can be used and changed, it stays unlocked until someone taps "Lock the phone again" on its home screen, and locking puts the whole lock back. Removing the lock is different: the phone stops being managed and cannot be locked again without erasing it and setting it up from scratch.
 
 ## What is deliberately not locked down
 

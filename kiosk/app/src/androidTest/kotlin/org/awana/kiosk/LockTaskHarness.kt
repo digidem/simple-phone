@@ -27,7 +27,8 @@ object LockTaskHarness {
      * `Until.hasObject` wait for a kiosk view never matches and burns its whole
      * timeout even though the launcher came up in about four seconds.
      */
-    fun startLauncher(context: Context, device: UiDevice) {
+    /** [expectLock] false is for an unlocked phone, where the launcher must not take it. */
+    fun startLauncher(context: Context, device: UiDevice, expectLock: Boolean = true) {
         // A freshly created emulator turns its screen off between runs; an
         // activity started behind a dark screen is stopped at once and never
         // gets a focused window, so every injected key would ANR the app.
@@ -40,7 +41,13 @@ object LockTaskHarness {
                 .setComponent(home)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
-        awaitLocked(context, device, "the launcher did not take lock task")
+        if (expectLock) {
+            awaitLocked(context, device, "the launcher did not take lock task")
+        } else {
+            // Long enough for onResume to have taken the lock if it was going to.
+            device.waitForIdle(SETTLE_MS)
+            Thread.sleep(UNLOCKED_GRACE_MS)
+        }
     }
 
     /** Waits until the kiosk holds lock task and its window has focus, or fails [what]. */
@@ -107,5 +114,6 @@ object LockTaskHarness {
 
     private const val TIMEOUT_MS = 30_000L
     private const val POLL_MS = 250L
+    private const val UNLOCKED_GRACE_MS = 3_000L
     const val SETTLE_MS = 2_000L
 }

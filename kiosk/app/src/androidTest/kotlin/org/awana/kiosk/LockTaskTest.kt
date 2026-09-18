@@ -1,5 +1,6 @@
 package org.awana.kiosk
 
+import android.os.UserManager
 import android.app.ActivityManager
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -9,7 +10,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import org.awana.kiosk.policy.DevicePolicy
-import org.awana.kiosk.policy.LockTaskBreakService
+import org.awana.kiosk.policy.PhoneLock
 import org.awana.kiosk.policy.Provisioner
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -52,6 +53,7 @@ class LockTaskTest {
 
     @After
     fun tearDown() {
+        PhoneLock.forgetUnlocked(context)
         LockTaskHarness.leave(context)
         device.executeShellCommand("cmd statusbar collapse")
         device.waitForIdle(LockTaskHarness.SETTLE_MS)
@@ -134,22 +136,44 @@ class LockTaskTest {
     }
 
     @Test
-    fun aTimedBreakLocksTheDeviceAgainWhenItExpires() {
+    fun anUnlockedPhoneStaysUnlockedWhenItsLauncherComesBack() {
         enterLockTask()
         LockTaskHarness.leave(context)
+
+        val problems = runBlocking { PhoneLock.unlock(context) }
+        assertTrue("unlocking reported: $problems", problems.isEmpty())
+        LockTaskHarness.startLauncher(context, device, expectLock = false)
+
         assertEquals(
-            "the break has to start from an unlocked device or this proves nothing",
+            "the launcher took the lock back on a phone an admin had unlocked",
             ActivityManager.LOCK_TASK_MODE_NONE,
             LockTaskHarness.lockTaskModeState(context),
         )
+        assertFalse(
+            "apps are still protected from uninstalling on an unlocked phone",
+            policy.hasRestriction(UserManager.DISALLOW_UNINSTALL_APPS),
+        )
+        assertTrue("unlocking gave up device ownership", policy.isDeviceOwner)
+    }
 
-        LockTaskBreakService.start(context, BREAK_MS)
+    @Test
+    fun lockingAgainPutsTheWholeLockBack() {
+        enterLockTask()
+        LockTaskHarness.leave(context)
+        runBlocking { PhoneLock.unlock(context) }
+
+        val problems = runBlocking { PhoneLock.lock(context) }
+        assertTrue("locking again reported: $problems", problems.isEmpty())
+        LockTaskHarness.startLauncher(context, device)
 
         LockTaskHarness.awaitLocked(
             context,
             device,
-            "the timed break expired without putting the device back into lock task, " +
-                "which would leave a phone unlocked in the field",
+            "the launcher did not take the lock back after the phone was locked again",
+        )
+        assertTrue(
+            "locking again left the apps uninstallable",
+            policy.hasRestriction(UserManager.DISALLOW_UNINSTALL_APPS),
         )
     }
 
@@ -168,6 +192,5 @@ class LockTaskTest {
 
     private companion object {
         const val SYSTEM_UI = "com.android.systemui"
-        const val BREAK_MS = 2_000L
     }
 }

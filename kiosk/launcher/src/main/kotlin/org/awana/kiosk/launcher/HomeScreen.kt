@@ -29,6 +29,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +66,12 @@ sealed interface HomeState {
 
     /** Set up, but the deployment shows nothing here. */
     data object NoApps : HomeState
+
+    /** Unlocked from the admin screen, until someone locks it again. */
+    data class Unlocked(val canOpenOtherApps: Boolean) : HomeState
+
+    /** The lock was removed for good; this app is only still here until it is uninstalled. */
+    data object LockRemoved : HomeState
 }
 
 /**
@@ -81,6 +91,10 @@ fun HomeScreen(
     onAdminGesture: () -> Unit,
     /** Debug builds only; see [TestSetupScreen]. */
     onSetUpForTesting: (() -> Unit)? = null,
+    onScanCode: () -> Unit = {},
+    onRelock: () -> Unit = {},
+    onOpenOtherApps: () -> Unit = {},
+    onChooseHome: () -> Unit = {},
 ) {
     Box(
         modifier = Modifier
@@ -100,6 +114,7 @@ fun HomeScreen(
                 setUpAgainLabel = stringResource(R.string.launcher_set_up)
                     .takeIf { state.canSetUpAgain },
                 onSetUpAgain = onSetUpAgain,
+                onScanCode = onScanCode,
                 onRemoveLock = onRemoveLock,
                 onSetUpForTesting = onSetUpForTesting,
             )
@@ -114,9 +129,48 @@ fun HomeScreen(
                 setUpAgainLabel = stringResource(R.string.launcher_set_up_again)
                     .takeIf { state.canSetUpAgain },
                 onSetUpAgain = onSetUpAgain,
+                onScanCode = onScanCode,
                 onRemoveLock = onRemoveLock,
                 onSetUpForTesting = onSetUpForTesting,
             )
+
+            // Says so in as many words, so a phone left unlocked is noticed
+            // by whoever picks it up, and locking it is the obvious next tap.
+            is HomeState.Unlocked -> Message(
+                testTag = TAG_UNLOCKED,
+                glyph = R.drawable.ic_lock_open,
+                glyphContainer = MaterialTheme.colorScheme.errorContainer,
+                glyphColor = MaterialTheme.colorScheme.onErrorContainer,
+                headline = stringResource(R.string.launcher_unlocked),
+                body = stringResource(R.string.launcher_unlocked_body),
+            ) {
+                Button(
+                    onClick = onRelock,
+                    modifier = Modifier.fillMaxWidth().testTag(TAG_LOCK_AGAIN),
+                ) { Text(stringResource(R.string.launcher_lock_again)) }
+                if (state.canOpenOtherApps) {
+                    OutlinedButton(
+                        onClick = onOpenOtherApps,
+                        modifier = Modifier.fillMaxWidth().testTag(TAG_OPEN_OTHER_APPS),
+                    ) { Text(stringResource(R.string.launcher_open_other_apps)) }
+                }
+            }
+
+            // Normally never seen: removing the lock also takes this app out of
+            // the running for HOME. This is for a phone where that did not take.
+            HomeState.LockRemoved -> Message(
+                testTag = TAG_LOCK_REMOVED,
+                glyph = R.drawable.ic_phone_blank,
+                glyphContainer = MaterialTheme.colorScheme.surfaceVariant,
+                glyphColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                headline = stringResource(R.string.launcher_lock_removed),
+                body = stringResource(R.string.launcher_lock_removed_body),
+            ) {
+                Button(
+                    onClick = onChooseHome,
+                    modifier = Modifier.fillMaxWidth().testTag(TAG_CHOOSE_HOME),
+                ) { Text(stringResource(R.string.launcher_choose_home)) }
+            }
 
             // No recovery buttons: the phone is provisioned, so the PIN works
             // and admin is reachable. This is a pointer, not a way out.
@@ -263,20 +317,34 @@ private fun Recovery(
     body: String,
     setUpAgainLabel: String?,
     onSetUpAgain: () -> Unit,
+    onScanCode: () -> Unit,
     onRemoveLock: () -> Unit,
     onSetUpForTesting: (() -> Unit)?,
 ) {
+    var confirmRemove by remember { mutableStateOf(false) }
     Message(testTag, glyph, glyphContainer, glyphColor, headline, body) {
-        setUpAgainLabel?.let {
+        // Retrying the kept code is the quicker way out when there is one;
+        // scanning is the way when there is not, and the only way to a
+        // different deployment.
+        if (setUpAgainLabel != null) {
             Button(
                 onClick = onSetUpAgain,
                 modifier = Modifier.fillMaxWidth().testTag(TAG_SET_UP_AGAIN),
-            ) { Text(it) }
+            ) { Text(setUpAgainLabel) }
+            OutlinedButton(
+                onClick = onScanCode,
+                modifier = Modifier.fillMaxWidth().testTag(TAG_SCAN_CODE),
+            ) { Text(stringResource(R.string.launcher_scan)) }
+        } else {
+            Button(
+                onClick = onScanCode,
+                modifier = Modifier.fillMaxWidth().testTag(TAG_SCAN_CODE),
+            ) { Text(stringResource(R.string.launcher_scan)) }
         }
-        OutlinedButton(
-            onClick = onRemoveLock,
+        TextButton(
+            onClick = { confirmRemove = true },
             modifier = Modifier.fillMaxWidth().testTag(TAG_REMOVE_LOCK),
-        ) { Text(stringResource(R.string.launcher_remove_lock)) }
+        ) { Text(stringResource(R.string.launcher_remove_lock), color = MaterialTheme.colorScheme.error) }
         Text(
             // Not an oversight: with no config there is no admin PIN to check,
             // so a gate here could never open, and there is nothing on the
@@ -291,6 +359,16 @@ private fun Recovery(
                 Text(stringResource(R.string.launcher_test_setup))
             }
         }
+    }
+    if (confirmRemove) {
+        RemoveLockDialog(
+            suggestUnlock = false,
+            onConfirm = {
+                confirmRemove = false
+                onRemoveLock()
+            },
+            onDismiss = { confirmRemove = false },
+        )
     }
 }
 
@@ -379,6 +457,12 @@ const val TAG_SETUP_UNFINISHED = "launcher-setup-unfinished"
 const val TAG_NO_APPS = "launcher-no-apps"
 const val TAG_SET_UP_AGAIN = "launcher-set-up-again"
 const val TAG_REMOVE_LOCK = "launcher-remove-lock"
+const val TAG_SCAN_CODE = "launcher-scan-code"
+const val TAG_UNLOCKED = "launcher-unlocked"
+const val TAG_LOCK_AGAIN = "launcher-lock-again"
+const val TAG_OPEN_OTHER_APPS = "launcher-open-other-apps"
+const val TAG_LOCK_REMOVED = "launcher-lock-removed"
+const val TAG_CHOOSE_HOME = "launcher-choose-home"
 const val TAG_SET_UP_FOR_TESTING = "launcher-test-setup"
 const val TAG_ADMIN_CORNER = "launcher-admin-corner"
 

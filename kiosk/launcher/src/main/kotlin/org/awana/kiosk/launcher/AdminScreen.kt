@@ -19,7 +19,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,7 +58,9 @@ import org.awana.kiosk.shared.LauncherRole
 import org.awana.kiosk.shared.withEntry
 import org.awana.kiosk.policy.DeviceFacts
 import org.awana.kiosk.policy.DevicePolicy
-import org.awana.kiosk.policy.LockTaskBreakService
+import org.awana.kiosk.policy.LocalApps
+import org.awana.kiosk.policy.PhoneLock
+import org.awana.kiosk.policy.SideloadFromFile
 import org.awana.kiosk.policy.Provisioner
 import org.awana.kiosk.policy.SideloadFromUrl
 import org.awana.kiosk.policy.WifiAdmin
@@ -63,7 +68,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class Page { Menu, About, Change, Update, Wrong, VisibleApps, ChangePin, Wifi, InstallUrl }
+private enum class Page { Menu, About, Change, Update, Wrong, VisibleApps, ChangePin, Wifi, InstallUrl, InstallFile }
 
 /**
  * Three doors behind the PIN: what this phone is, what can be changed about it,
@@ -93,6 +98,7 @@ fun AdminScreen(onDone: () -> Unit) {
             Page.ChangePin -> ChangePinPage(onBack = { page = Page.Change })
             Page.Wifi -> WifiPage(onBack = { page = Page.Change })
             Page.InstallUrl -> InstallUrlPage(onBack = { page = Page.Wrong })
+            Page.InstallFile -> InstallFilePage(onBack = { page = Page.Wrong })
         }
     }
 }
@@ -236,7 +242,7 @@ private fun ChangePage(onNavigate: (Page) -> Unit, onBack: () -> Unit) {
         // Everything else on this page is one curated setting. This is the
         // escape hatch from curating them one feature request at a time — the
         // phone's own settings, behind the same PIN that can remove the lock
-        // altogether, and put back by `LockTaskBreakService` when the break ends.
+        // altogether, and opened inside the lock.
         item {
             AdminDoor(R.string.admin_settings, R.string.admin_settings_body, TAG_ROW_SETTINGS) {
                 openPhoneSettings(context)
@@ -259,7 +265,7 @@ private fun openPhoneSettings(context: Context) {
 }
 
 /**
- * The three ordinary fixes, a labelled break, then the one that cannot be
+ * The ordinary fixes, unlocking, a labelled break, then the one that cannot be
  * undone — so a trainer who came for the first never lands beside the last.
  */
 @Composable
@@ -271,6 +277,7 @@ private fun SomethingWrongPage(onNavigate: (Page) -> Unit, onDone: () -> Unit, o
     var confirmUnlock by remember { mutableStateOf(false) }
     var confirmUnprovision by remember { mutableStateOf(false) }
     var unprovisionProblems by remember { mutableStateOf<String?>(null) }
+    val unlocked = remember { PhoneLock.isUnlocked(context) }
 
     AdminPage(stringResource(R.string.admin_wrong), onBack, TAG_ADMIN_WRONG) {
         item {
@@ -283,13 +290,30 @@ private fun SomethingWrongPage(onNavigate: (Page) -> Unit, onDone: () -> Unit, o
             }
         }
         item {
+            AdminDoor(R.string.admin_install_file, R.string.admin_install_file_body, TAG_ROW_INSTALL_FILE) {
+                onNavigate(Page.InstallFile)
+            }
+        }
+        item {
             AdminDoor(R.string.admin_install_url, R.string.admin_install_url_body, TAG_ROW_INSTALL_URL) {
                 onNavigate(Page.InstallUrl)
             }
         }
         item {
-            AdminDoor(R.string.admin_unlock_temporarily, R.string.admin_unlock_temporarily_body, TAG_ROW_UNLOCK) {
-                confirmUnlock = true
+            if (unlocked) {
+                AdminDoor(R.string.admin_lock_again, R.string.admin_lock_again_body, TAG_ROW_LOCK_AGAIN) {
+                    scope.launch {
+                        busy = context.getString(R.string.admin_lock_again)
+                        val problems = PhoneLock.lock(context)
+                        busy = null
+                        // The launcher takes lock task back as it returns.
+                        if (problems.isEmpty()) onDone() else result = problems.joinToString("\n\n")
+                    }
+                }
+            } else {
+                AdminDoor(R.string.admin_unlock, R.string.admin_unlock_body, TAG_ROW_UNLOCK) {
+                    confirmUnlock = true
+                }
             }
         }
         item {
@@ -323,30 +347,33 @@ private fun SomethingWrongPage(onNavigate: (Page) -> Unit, onDone: () -> Unit, o
 
     if (confirmUnlock) {
         Confirm(
-            title = stringResource(R.string.admin_unlock_temporarily),
+            title = stringResource(R.string.admin_unlock),
             body = stringResource(R.string.admin_unlock_explain),
             confirmLabel = stringResource(R.string.action_unlock),
             onConfirm = {
                 confirmUnlock = false
-                (context as? Activity)?.stopLockTask()
-                LockTaskBreakService.start(context)
-                onDone()
+                // Out of lock task first: emptying the allowlist under a
+                // running lock would end it in whatever state it pleased.
+                runCatching { (context as? Activity)?.stopLockTask() }
+                scope.launch {
+                    busy = context.getString(R.string.admin_unlock)
+                    val problems = PhoneLock.unlock(context)
+                    busy = null
+                    if (problems.isEmpty()) onDone() else unprovisionProblems = problems.joinToString("\n\n")
+                }
             },
             onDismiss = { confirmUnlock = false },
         )
     }
 
     if (confirmUnprovision) {
-        Confirm(
-            title = stringResource(R.string.admin_unprovision),
-            body = stringResource(R.string.admin_unprovision_explain),
-            confirmLabel = stringResource(R.string.action_unprovision),
-            destructive = true,
+        RemoveLockDialog(
+            suggestUnlock = !unlocked,
             onConfirm = {
                 confirmUnprovision = false
-                (context as? Activity)?.stopLockTask()
                 scope.launch {
                     busy = context.getString(R.string.admin_unprovision)
+                    runCatching { (context as? Activity)?.stopLockTask() }
                     val problems = unprovision(context)
                     busy = null
                     if (problems.isEmpty()) onDone() else unprovisionProblems = problems.joinToString("\n\n")
@@ -360,6 +387,8 @@ private fun SomethingWrongPage(onNavigate: (Page) -> Unit, onDone: () -> Unit, o
 private suspend fun reapplyPolicy(context: Context): String = withContext(Dispatchers.Default) {
     val config = ConfigStore(context).load()
         ?: return@withContext context.getString(R.string.admin_no_config)
+    // Putting everything back is locking it again.
+    PhoneLock.forgetUnlocked(context)
     val policy = DevicePolicy(context)
     if (!policy.isDeviceOwner) {
         return@withContext context.getString(R.string.admin_not_device_owner)
@@ -530,8 +559,13 @@ private fun Fact(label: Int, value: String) {
 @Composable
 private fun VisibleAppsPage(onBack: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val store = remember { ConfigStore(context) }
     var config by remember { mutableStateOf(store.load()) }
+    var others by remember { mutableStateOf<List<LocalApps.Candidate>>(emptyList()) }
+    var allowing by remember { mutableStateOf<LocalApps.Candidate?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(config) { others = LocalApps.unlisted(context) }
 
     AdminPage(stringResource(R.string.admin_visible_apps), onBack, TAG_ADMIN_VISIBLE_APPS) {
         val packages = config?.packages.orEmpty()
@@ -563,7 +597,52 @@ private fun VisibleAppsPage(onBack: () -> Unit) {
                 },
             )
         }
+        if (config != null && others.isNotEmpty()) {
+            item { Section(R.string.admin_other_apps) }
+            item {
+                Text(
+                    text = stringResource(R.string.admin_other_apps_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+            items(others, key = { it.packageName }) { app ->
+                ListItem(
+                    headlineContent = { Text(app.label) },
+                    supportingContent = { Text(app.packageName) },
+                    trailingContent = {
+                        TextButton(
+                            onClick = { allowing = app },
+                            modifier = Modifier.testTag("allow-${app.packageName}"),
+                        ) { Text(stringResource(R.string.action_allow)) }
+                    },
+                )
+            }
+        }
     }
+
+    allowing?.let { app ->
+        Confirm(
+            title = stringResource(R.string.install_file_allow_title, app.label),
+            body = stringResource(R.string.install_file_allow_body, app.label),
+            confirmLabel = stringResource(R.string.action_allow),
+            onConfirm = {
+                allowing = null
+                scope.launch {
+                    val problems = LocalApps.allow(context, app.packageName)
+                    config = store.load()
+                    message = if (problems.isEmpty()) {
+                        context.getString(R.string.admin_allowed, app.label)
+                    } else {
+                        problems.joinToString("\n\n")
+                    }
+                }
+            },
+            onDismiss = { allowing = null },
+        )
+    }
+    message?.let { Info(it) { message = null } }
 }
 
 @Composable
@@ -627,6 +706,88 @@ private fun WifiPage(onBack: () -> Unit) {
     }
     message?.let { Info(it) { message = null } }
 }
+
+/**
+ * The offline way to update or add an app: an APK already on the phone, picked
+ * with the system file picker. The picker opens inside the lock because the
+ * lock task features leave activity starts into this task allowed.
+ */
+@Composable
+private fun InstallFilePage(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var message by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var allowing by remember { mutableStateOf<String?>(null) }
+
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            busy = true
+            when (val outcome = SideloadFromFile.run(context, uri)) {
+                is SideloadFromFile.Outcome.Installed ->
+                    if (outcome.known) message = outcome.message else allowing = outcome.packageName
+                is SideloadFromFile.Outcome.Refused -> message = outcome.message
+            }
+            busy = false
+        }
+    }
+
+    AdminPage(stringResource(R.string.admin_install_file), onBack, TAG_ADMIN_INSTALL_FILE) {
+        item {
+            Text(
+                text = stringResource(R.string.install_file_explain),
+                modifier = Modifier.padding(16.dp),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        item {
+            Button(
+                onClick = { pick.launch(arrayOf(APK_MIME, "application/octet-stream")) },
+                enabled = !busy,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .testTag(TAG_INSTALL_FILE_CHOOSE),
+            ) { Text(stringResource(R.string.install_file_choose)) }
+        }
+    }
+
+    if (busy) {
+        AlertDialog(
+            onDismissRequest = {},
+            text = { Text(stringResource(R.string.admin_working, stringResource(R.string.action_install))) },
+            confirmButton = {},
+            modifier = Modifier.testTag(TAG_DIALOG_BUSY),
+        )
+    }
+    allowing?.let { packageName ->
+        val label = appLabel(context, packageName)
+        Confirm(
+            title = stringResource(R.string.install_file_allow_title, label),
+            body = stringResource(R.string.install_file_allow_body, label),
+            confirmLabel = stringResource(R.string.action_allow),
+            onConfirm = {
+                allowing = null
+                scope.launch {
+                    val problems = LocalApps.allow(context, packageName)
+                    message = if (problems.isEmpty()) {
+                        context.getString(R.string.admin_allowed, label)
+                    } else {
+                        problems.joinToString("\n\n")
+                    }
+                }
+            },
+            onDismiss = {
+                allowing = null
+                message = context.getString(R.string.sideload_ok_not_allowed, label)
+            },
+        )
+    }
+    message?.let { Info(it) { message = null } }
+}
+
+private const val APK_MIME = "application/vnd.android.package-archive"
 
 @Composable
 private fun InstallUrlPage(onBack: () -> Unit) {
@@ -797,4 +958,8 @@ const val TAG_ROW_WIFI = "admin-row-wifi"
 const val TAG_ROW_REAPPLY = "admin-row-reapply"
 const val TAG_ROW_INSTALL_URL = "admin-row-install-url"
 const val TAG_ROW_UNLOCK = "admin-row-unlock"
+const val TAG_ROW_LOCK_AGAIN = "admin-row-lock-again"
+const val TAG_ROW_INSTALL_FILE = "admin-row-install-file"
+const val TAG_ADMIN_INSTALL_FILE = "admin-install-file"
+const val TAG_INSTALL_FILE_CHOOSE = "admin-install-file-choose"
 const val TAG_ROW_UNPROVISION = "admin-row-unprovision"

@@ -149,6 +149,7 @@ class DevicePolicy(context: Context) {
     // --- Home ----------------------------------------------------------------
 
     fun applyHome() {
+        launcherComponent(appContext)?.let { setLauncherEnabled(it, true) }
         val filter = IntentFilter(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_HOME)
             addCategory(Intent.CATEGORY_DEFAULT)
@@ -159,6 +160,27 @@ class DevicePolicy(context: Context) {
 
     fun clearHome() {
         dpm.clearPackagePersistentPreferredActivities(admin, appContext.packageName)
+    }
+
+    /**
+     * Takes this app out of the running for HOME once the lock is gone, so the
+     * phone's own launcher comes back instead of an empty kiosk. [applyHome]
+     * turns it back on, which only a fresh setup can reach.
+     */
+    fun stepAside() {
+        launcherComponent(appContext)?.let { setLauncherEnabled(it, false) }
+    }
+
+    private fun setLauncherEnabled(component: ComponentName, enabled: Boolean) {
+        appContext.packageManager.setComponentEnabledSetting(
+            component,
+            if (enabled) {
+                PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+            } else {
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            },
+            PackageManager.DONT_KILL_APP,
+        )
     }
 
     // --- Uninstall and force-stop protection ---------------------------------
@@ -327,15 +349,35 @@ class DevicePolicy(context: Context) {
     // --- Un-provisioning -----------------------------------------------------
 
     /**
+     * Lifts every part of the lock this app can put back: lock task,
+     * restrictions, uninstall and force-stop protection. Keeps device
+     * ownership and HOME, so [applyAll] restores the lock exactly.
+     *
+     * [config] names the packages whose uninstall blocking has to be lifted.
+     */
+    fun unlock(config: KioskConfig?): List<String> = Steps().also { liftLock(it, config) }
+        .result().failures.distinct()
+
+    /**
      * Returns the device to a normal, unmanaged state and says in words what it
      * could not undo. Cannot be undone without a factory reset.
-     *
-     * [config] names the packages whose uninstall blocking has to be lifted;
-     * without it those apps could be left undeletable after the owner is gone.
      */
     fun unprovision(config: KioskConfig?): List<String> {
         val steps = Steps()
         steps.run("home", R.string.unprovision_failed_home) { clearHome() }
+        liftLock(steps, config)
+        steps.run("screen", R.string.unprovision_failed_screen) {
+            dpm.setKeyguardDisabled(admin, false)
+            dpm.setPermissionPolicy(admin, DevicePolicyManager.PERMISSION_POLICY_PROMPT)
+        }
+        // Last, because once the owner is gone none of the calls above is allowed.
+        steps.run("deviceOwner", R.string.unprovision_failed_device_owner) {
+            dpm.clearDeviceOwnerApp(appContext.packageName)
+        }
+        return steps.result().failures.distinct()
+    }
+
+    private fun liftLock(steps: Steps, config: KioskConfig?) {
         steps.run("lockTask", R.string.unprovision_failed_lock_task) {
             dpm.setLockTaskPackages(admin, emptyArray())
             dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_NONE)
@@ -353,15 +395,6 @@ class DevicePolicy(context: Context) {
         steps.run("userControl", R.string.unprovision_failed_uninstall_blocked) {
             dpm.setUserControlDisabledPackages(admin, emptyList())
         }
-        steps.run("screen", R.string.unprovision_failed_screen) {
-            dpm.setKeyguardDisabled(admin, false)
-            dpm.setPermissionPolicy(admin, DevicePolicyManager.PERMISSION_POLICY_PROMPT)
-        }
-        // Last, because once the owner is gone none of the calls above is allowed.
-        steps.run("deviceOwner", R.string.unprovision_failed_device_owner) {
-            dpm.clearDeviceOwnerApp(appContext.packageName)
-        }
-        return steps.result().failures.distinct()
     }
 
     private inner class Steps {
@@ -438,7 +471,10 @@ class DevicePolicy(context: Context) {
             val intent = Intent(Intent.ACTION_MAIN)
                 .addCategory(Intent.CATEGORY_HOME)
                 .setPackage(context.packageName)
-            val activity = context.packageManager.queryIntentActivities(intent, 0).firstOrNull()
+            // Found even when [stepAside] has disabled it, so applyHome can undo that.
+            val activity = context.packageManager
+                .queryIntentActivities(intent, PackageManager.MATCH_DISABLED_COMPONENTS)
+                .firstOrNull()
                 ?: return null
             return ComponentName(activity.activityInfo.packageName, activity.activityInfo.name)
         }

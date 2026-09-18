@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
 import org.awana.kiosk.policy.ConfigStore
+import org.awana.kiosk.policy.PhoneLock
 import org.awana.kiosk.policy.Provisioner
 import org.awana.kiosk.shared.AdminPin
 import org.awana.kiosk.shared.KioskConfig
@@ -14,6 +15,7 @@ import org.awana.kiosk.shared.PackageSpec
 import org.awana.kiosk.shared.ProvisioningBootstrap
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -43,6 +45,8 @@ class HomeStateTest {
         ConfigStore(context).clear()
         File(context.filesDir, "last-report.json").delete()
         File(context.filesDir, "pending-bootstrap.json").delete()
+        PhoneLock.forgetUnlocked(context)
+        PhoneLock.forgetRemoved(context)
     }
 
     /**
@@ -107,6 +111,31 @@ class HomeStateTest {
         // Provisioning needs Device Owner, which unprovisioning gives up, so
         // the kept bootstrap must not still be offered.
         assertEquals(HomeState.SetupUnfinished(canSetUpAgain = false), homeState(context))
+    }
+
+    @Test
+    fun anUnlockedPhoneSaysSoRatherThanShowingItsApps() = runBlocking {
+        ConfigStore(context).save(config(listOf(LauncherEntry(launchable))))
+        // The marker alone: this emulator is not the device owner, so the
+        // policy half of unlocking has nothing to act on here.
+        File(context.filesDir, "unlocked").writeText("")
+
+        assertTrue(homeState(context) is HomeState.Unlocked)
+    }
+
+    @Test
+    fun aPhoneWhoseLockWasRemovedSaysSoWhateverElseIsLeft() = runBlocking {
+        ConfigStore(context).save(config(listOf(LauncherEntry(launchable))))
+        PhoneLock.markRemoved(context)
+
+        assertEquals(HomeState.LockRemoved, homeState(context))
+    }
+
+    @Test
+    fun removingTheLockFromAPhoneItNeverOwnedIsNotRecordedAsARemoval() = runBlocking {
+        unprovision(context)
+
+        assertFalse(PhoneLock.isRemoved(context))
     }
 
     @Test

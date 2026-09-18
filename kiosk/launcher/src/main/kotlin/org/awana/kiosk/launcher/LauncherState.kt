@@ -1,10 +1,13 @@
 package org.awana.kiosk.launcher
 
 import android.content.Context
+import android.content.Intent
+import android.content.pm.ApplicationInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.awana.kiosk.policy.ConfigStore
 import org.awana.kiosk.policy.DevicePolicy
+import org.awana.kiosk.policy.PhoneLock
 import org.awana.kiosk.policy.Provisioner
 import org.awana.kiosk.policy.Provisioning
 import org.awana.kiosk.shared.LauncherRole
@@ -18,8 +21,12 @@ import org.awana.kiosk.shared.LauncherRole
  * nothing was never set up at all.
  */
 suspend fun homeState(context: Context): HomeState = withContext(Dispatchers.IO) {
+    if (PhoneLock.isRemoved(context)) return@withContext HomeState.LockRemoved
     val config = ConfigStore(context).load()
     val provisioner = Provisioner(context)
+    if (config != null && PhoneLock.isUnlocked(context)) {
+        return@withContext HomeState.Unlocked(canOpenOtherApps = otherHome(context) != null)
+    }
 
     if (config == null) {
         val canSetUpAgain = provisioner.pendingBootstrap() != null
@@ -52,8 +59,10 @@ fun setUpAgain(context: Context): Boolean = Provisioning.setUpAgain(context)
 suspend fun unprovision(context: Context): List<String> = withContext(Dispatchers.Default) {
     val store = ConfigStore(context)
     val config = store.load()
+    val policy = DevicePolicy(context)
+    val wasOwner = policy.isDeviceOwner
     val failures = try {
-        DevicePolicy(context).unprovision(config)
+        policy.unprovision(config)
     } catch (e: Exception) {
         listOf(context.getString(R.string.admin_unprovision_failed))
     } finally {
@@ -62,5 +71,30 @@ suspend fun unprovision(context: Context): List<String> = withContext(Dispatcher
         // bootstrap can no longer be re-run: offering it would be a dead button.
         Provisioner(context).clearPendingBootstrap()
     }
+    if (wasOwner && !policy.isDeviceOwner) {
+        PhoneLock.markRemoved(context)
+        runCatching { policy.stepAside() }
+    }
     failures
+}
+
+/**
+ * The phone's own launcher, for an unlocked phone and one whose lock is gone.
+ * Its activity rather than a HOME intent: this app is still the preferred HOME
+ * while unlocked, so the intent would only come back here.
+ */
+fun otherHome(context: Context): Intent? {
+    val pm = context.packageManager
+    val homes = pm.queryIntentActivities(
+        Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+        0,
+    ).filter { it.activityInfo.packageName != context.packageName }
+    // The phone's own launcher over anything installed later.
+    val home = homes.firstOrNull { it.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0 }
+        ?: homes.firstOrNull()
+        ?: return null
+    return Intent(Intent.ACTION_MAIN)
+        .addCategory(Intent.CATEGORY_HOME)
+        .setClassName(home.activityInfo.packageName, home.activityInfo.name)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 }
