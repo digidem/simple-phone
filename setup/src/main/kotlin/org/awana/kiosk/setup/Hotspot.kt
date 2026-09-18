@@ -1,6 +1,7 @@
 package org.awana.kiosk.setup
 
 import android.content.Context
+import android.net.ConnectivityManager
 import android.net.wifi.SoftApConfiguration
 import android.net.wifi.WifiManager
 import android.os.Handler
@@ -92,7 +93,7 @@ class LocalOnlyHotspot(context: Context) : Hotspot {
                 )
             }
         }
-        val gateway = localAddress() ?: return Result.failure(
+        val gateway = localAddress(appContext) ?: return Result.failure(
             HotspotError("The hotspot started but has no address yet. Try again."),
         )
         return Result.success(
@@ -129,10 +130,12 @@ class LocalOnlyHotspot(context: Context) : Hotspot {
  * is inconsistent, and some phones only offer WPA3, which the QR cannot express.
  */
 class ManualHotspot(
+    context: Context,
     private val details: HotspotDetails,
+    private val findAddress: () -> String? = { localAddress(context.applicationContext) },
 ) : Hotspot {
     override suspend fun start(): Result<HotspotDetails> {
-        val gateway = localAddress()
+        val gateway = findAddress()
             ?: return Result.failure(
                 HotspotError(
                     "This phone is not sharing a network yet. Turn on the hotspot in Settings, " +
@@ -156,15 +159,55 @@ class HotspotError(message: String) : Exception(message)
  * The gateway address is commonly 192.168.43.1 but varies by OEM, so it is read
  * rather than assumed.
  */
-internal fun localAddress(): String? =
+internal fun localAddress(context: Context): String? =
+    pickHotspotAddress(siteLocalAddresses(), clientInterfaces(context))
+
+internal data class LocalAddress(val interfaceName: String, val address: String)
+
+internal fun siteLocalAddresses(): List<LocalAddress> =
     NetworkInterface.getNetworkInterfaces().toList()
-        .asSequence()
         .filter { it.isUp && !it.isLoopback }
-        .sortedBy { interfaceRank(it.name.orEmpty()) }
-        .flatMap { it.inetAddresses.toList().asSequence() }
-        .filterIsInstance<Inet4Address>()
-        .firstOrNull { !it.isLoopbackAddress && it.isSiteLocalAddress }
-        ?.hostAddress
+        .flatMap { iface ->
+            iface.inetAddresses.toList()
+                .filterIsInstance<Inet4Address>()
+                .filter { !it.isLoopbackAddress && it.isSiteLocalAddress }
+                .map { LocalAddress(iface.name.orEmpty(), it.hostAddress.orEmpty()) }
+        }
+
+/**
+ * Interfaces this phone reaches a network *through*: its own Wi-Fi connection,
+ * mobile data. A hotspot is not a network the phone is a client of, so its
+ * interface never appears here.
+ */
+internal fun clientInterfaces(context: Context): Set<String> {
+    val manager = context.getSystemService(ConnectivityManager::class.java) ?: return emptySet()
+    @Suppress("DEPRECATION")
+    return manager.allNetworks.mapNotNull { manager.getLinkProperties(it)?.interfaceName }.toSet()
+}
+
+/**
+ * The address phones joining the hotspot can reach this one at. An address on
+ * a client interface is ruled out even when it is the only one: it works only
+ * while that network stays up: a session served from the phone's own Wi-Fi
+ * address stops working for every phone the moment that Wi-Fi goes off. Interface names vary too
+ * much by OEM to decide this alone; [interfaceRank] only breaks ties.
+ */
+internal fun pickHotspotAddress(candidates: List<LocalAddress>, clientInterfaces: Set<String>): String? =
+    candidates
+        .filter { it.interfaceName !in clientInterfaces }
+        .minByOrNull { interfaceRank(it.interfaceName) }
+        ?.address
+
+/** Whether [address] is still one of this phone's own, for a session to notice its hotspot going. */
+internal fun isLocalAddress(address: String): Boolean =
+    runCatching { siteLocalAddresses().any { it.address == address } }.getOrDefault(false)
+
+internal fun describeInterfaces(context: Context): String {
+    val clients = clientInterfaces(context)
+    return siteLocalAddresses().joinToString(", ") {
+        "${it.interfaceName}=${it.address}" + if (it.interfaceName in clients) " (client)" else ""
+    }.ifEmpty { "none" }
+}
 
 private val TETHERED_WLAN = Regex("wlan[1-9]\\d*")
 

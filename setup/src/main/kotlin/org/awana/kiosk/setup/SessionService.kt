@@ -48,6 +48,7 @@ class SessionService : Service() {
         scope.launch {
             val hotspot = if (manual) {
                 ManualHotspot(
+                    this@SessionService,
                     HotspotDetails(
                         ssid = intent.getStringExtra(EXTRA_SSID).orEmpty(),
                         passphrase = intent.getStringExtra(EXTRA_PASSPHRASE).orEmpty(),
@@ -58,7 +59,7 @@ class SessionService : Service() {
             } else {
                 LocalOnlyHotspot(this@SessionService)
             }
-            session.start(profile, hotspot)
+            if (session.start(profile, hotspot).isSuccess) session.watchAddress()
         }
         return START_NOT_STICKY
     }

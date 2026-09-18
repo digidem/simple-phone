@@ -2,6 +2,7 @@ package org.awana.kiosk.setup
 
 import android.content.Context
 import android.util.Base64
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -226,7 +227,8 @@ class ProvisioningSession(context: Context) {
         Telemetry.info(
             TAG,
             "Session started at $serverUrl: ${hotspot.javaClass.simpleName}, " +
-                "security ${details.securityType}, ${specs.size} app(s), QR ${payload.length} bytes",
+                "security ${details.securityType}, ${specs.size} app(s), QR ${payload.length} bytes, " +
+                "interfaces ${describeInterfaces(appContext)}",
         )
         _state.value = SessionState(
             running = true,
@@ -237,6 +239,37 @@ class ProvisioningSession(context: Context) {
             qrPayload = payload,
         )
         return Result.success(Unit)
+    }
+
+    /**
+     * Returns when the session ends. If the address the code points at stops
+     * being this phone's — the hotspot turned off, Wi-Fi switched — the code
+     * would send every phone that scans it to nothing, and the setup wizard
+     * waits on that forever without saying why. So the code comes down and
+     * the trainer is told instead.
+     */
+    suspend fun watchAddress(isStillLocal: (String) -> Boolean = ::isLocalAddress) {
+        while (true) {
+            delay(WATCH_MS)
+            val now = _state.value
+            if (!now.running) return
+            val address = now.hotspot?.gatewayAddress ?: return
+            if (isStillLocal(address)) continue
+
+            Telemetry.report(
+                TAG,
+                "The session's address went away",
+                level = SentryLevel.WARNING,
+                extras = mapOf("address" to address, "interfaces" to describeInterfaces(appContext)),
+            )
+            stop()
+            _state.value = SessionState(
+                profileId = now.profileId,
+                profileName = now.profileName,
+                error = appContext.getString(R.string.session_address_lost),
+            )
+            return
+        }
     }
 
     fun stop() {
@@ -318,6 +351,7 @@ class ProvisioningSession(context: Context) {
 
     private companion object {
         const val TAG = "ProvisioningSession"
+        const val WATCH_MS = 5_000L
         const val PORT = 8080
         const val SOCKET_TIMEOUT_MS = 60_000
         const val KIOSK_APK = "kiosk.apk"

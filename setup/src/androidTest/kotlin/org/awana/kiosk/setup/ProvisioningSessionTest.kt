@@ -78,6 +78,19 @@ class ProvisioningSessionTest {
     }
 
     @Test
+    fun aSessionWhoseAddressGoesAwayTakesItsCodeDown() = runBlocking {
+        session.start(profile(), FakeHotspot()).getOrThrow()
+        assertTrue(session.state.value.qrPayload != null)
+
+        // The hotspot switched off under a running session.
+        session.watchAddress(isStillLocal = { false })
+
+        val state = session.state.value
+        assertEquals("a code that leads nowhere is still on screen", null, state.qrPayload)
+        assertTrue("the trainer was not told why", !state.error.isNullOrBlank())
+    }
+
+    @Test
     fun theServedConfigHashesToTheValueInTheQr() = runBlocking {
         session.start(profile(), FakeHotspot()).getOrThrow()
         val state = session.state.value

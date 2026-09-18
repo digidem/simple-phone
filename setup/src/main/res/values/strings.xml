@@ -175,6 +175,7 @@
     <string name="phone_not_installed">Not installed</string>
     <string name="phone_problem">Something did not finish</string>
 
+    <string name="session_address_lost">The hotspot stopped, or this phone\'s network changed, so phones can no longer reach it. The setup code has been taken down. Turn the hotspot on and start again.</string>
     <string name="session_manual_title">Set the hotspot up by hand</string>
     <string name="session_manual_help">If this phone cannot start a hotspot on its own, turn on the hotspot in Settings, then type its name and password here.</string>
     <string name="session_manual_ssid">Hotspot name</string>
