@@ -208,6 +208,17 @@ class LauncherActivity : ComponentActivity() {
             .onFailure { Log.w(TAG, "Could not take the lock back", it) }
     }
 
+    /**
+     * Home is pressed from wherever the phone was left, often by whoever it was
+     * handed back to — Settings opened from the admin screen, say. It must land
+     * on the home screen, never on an admin page still open behind it: that
+     * would be the admin screen without the PIN.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.hasCategory(Intent.CATEGORY_HOME) && screen != Screen.Home) backToHome()
+    }
+
     override fun onStop() {
         super.onStop()
         // A device left on the admin screen and pocketed must not still be

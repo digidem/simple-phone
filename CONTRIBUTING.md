@@ -334,6 +334,20 @@ the window between switching on and the launcher taking the lock: user
 restrictions, the allowlist and the persistent HOME preference all survive a
 reboot without the app running, but lock task engagement does not.
 
+**Pressing HOME always lands on the home screen, even with an admin page
+open.** The launcher used to return there whenever it stopped, which also fired
+when the admin screen opened the phone's settings or the file picker and lost
+the page waiting for their result. It resets on a HOME intent in `onNewIntent`
+instead, and on stopping only when the screen went off — anything else would
+hand back a phone showing the admin screen without its PIN.
+
+**One setup runs at a time, and an ignored start does not stop the service.**
+The wizard, the completion broadcast, "set this phone up again" and an admin
+update can all ask at once. A second start is ignored; it must not call
+`stopSelf`, because its start id is the newest one and the service would stop,
+cancelling the run in progress. Runs end on `stopSelf()` with no id, once
+nothing is running.
+
 **`LauncherActivity.onResume` takes the lock back.** `lockTaskMode="if_whitelisted"`
 only fires when the activity *starts*, and the launcher is `singleInstance`, so
 a resume after a crash gets no such call. It is skipped while an admin has the

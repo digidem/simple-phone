@@ -53,7 +53,9 @@ class LockTaskTest {
 
     @After
     fun tearDown() {
-        PhoneLock.forgetUnlocked(context)
+        // Put the lock back rather than only forgetting it was lifted: the
+        // classes that run after this one expect a locked-down device.
+        if (PhoneLock.isUnlocked(context)) runBlocking { PhoneLock.lock(context) }
         LockTaskHarness.leave(context)
         device.executeShellCommand("cmd statusbar collapse")
         device.waitForIdle(LockTaskHarness.SETTLE_MS)
@@ -136,24 +138,26 @@ class LockTaskTest {
     }
 
     @Test
-    fun anUnlockedPhoneStaysUnlockedWhenItsLauncherComesBack() {
+    fun unlockingLiftsTheLockButKeepsThePhoneManaged() {
         enterLockTask()
         LockTaskHarness.leave(context)
 
         val problems = runBlocking { PhoneLock.unlock(context) }
-        assertTrue("unlocking reported: $problems", problems.isEmpty())
-        LockTaskHarness.startLauncher(context, device, expectLock = false)
 
-        assertEquals(
-            "the launcher took the lock back on a phone an admin had unlocked",
-            ActivityManager.LOCK_TASK_MODE_NONE,
-            LockTaskHarness.lockTaskModeState(context),
-        )
+        assertTrue("unlocking reported: $problems", problems.isEmpty())
+        assertTrue("the lock task allowlist survived unlocking", policy.lockTaskPackages().isEmpty())
         assertFalse(
             "apps are still protected from uninstalling on an unlocked phone",
             policy.hasRestriction(UserManager.DISALLOW_UNINSTALL_APPS),
         )
-        assertTrue("unlocking gave up device ownership", policy.isDeviceOwner)
+        assertTrue("unlocking gave up device ownership, so it could never be locked again", policy.isDeviceOwner)
+
+        // And the launcher coming back does not take it back.
+        LockTaskHarness.startLauncher(context, device, expectLock = false)
+        assertEquals(
+            ActivityManager.LOCK_TASK_MODE_NONE,
+            LockTaskHarness.lockTaskModeState(context),
+        )
     }
 
     @Test

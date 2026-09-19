@@ -10,6 +10,7 @@ import androidx.test.filters.LargeTest
 import kotlinx.coroutines.runBlocking
 import org.awana.kiosk.policy.ConfigStore
 import org.awana.kiosk.policy.DevicePolicy
+import org.awana.kiosk.policy.PhoneLock
 import org.awana.kiosk.policy.Provisioner
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -88,6 +89,24 @@ class BootReceiverTest {
             "boot applied a policy set to a device that has no config to apply",
             policy.lockTaskPackages().isEmpty(),
         )
+    }
+
+    @Test
+    fun aPhoneAnAdminUnlockedIsStillUnlockedAfterARestart() = runBlocking {
+        Provisioner(context).provision(TestConfigs.policyOnly())
+        try {
+            PhoneLock.unlock(context)
+
+            deliverBootCompleted()
+
+            assertFalse(
+                "a restart locked a phone someone had unlocked to fix it",
+                policy.hasRestriction(UserManager.DISALLOW_SAFE_BOOT),
+            )
+            assertTrue("the lock task allowlist came back at boot", policy.lockTaskPackages().isEmpty())
+        } finally {
+            PhoneLock.lock(context)
+        }
     }
 
     /** `BOOT_COMPLETED` is a protected broadcast, so the receiver is called directly. */

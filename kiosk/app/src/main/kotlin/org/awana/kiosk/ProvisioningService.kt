@@ -50,22 +50,26 @@ class ProvisioningService : Service() {
         // Before any early return: a service started with startForegroundService
         // that stops without this takes the whole process down.
         startForeground()
-        if (intent?.action == Provisioning.ACTION_APPLY_UPDATE) {
-            applyStagedUpdate(startId)
+        val origin = intent?.getStringExtra(EXTRA_ORIGIN)
+        // One run at a time, whoever asks: two would share the staging files
+        // and delete each other's downloads. Not stopSelf here — the start id
+        // is the newest, so it would stop the service and cancel the run.
+        if (running) {
+            Telemetry.warn(TAG, "Setup is already running; ignoring a start from ${origin ?: intent?.action ?: "the launcher"}")
+            if (intent?.action == Provisioning.ACTION_APPLY_UPDATE) {
+                UpdateProgress.report(UpdateState.Failed(getString(R.string.update_setup_running)))
+            }
             return START_NOT_STICKY
         }
-
-        val origin = intent?.getStringExtra(EXTRA_ORIGIN)
+        if (intent?.action == Provisioning.ACTION_APPLY_UPDATE) {
+            applyStagedUpdate()
+            return START_NOT_STICKY
+        }
         // The compliance activity has usually done the work by the time the
         // completion broadcast arrives, where it arrives at all.
-        if (origin == ORIGIN_COMPLETION && (running || ConfigStore(this).load() != null)) {
+        if (origin == ORIGIN_COMPLETION && ConfigStore(this).load() != null) {
             Telemetry.info(TAG, "Completion broadcast after setup already ran; nothing to do")
-            stopSelf(startId)
-            return START_NOT_STICKY
-        }
-        if (running && origin != null) {
-            Telemetry.warn(TAG, "Setup is already running; ignoring a second start from the $origin")
-            stopSelf(startId)
+            stopIfIdle()
             return START_NOT_STICKY
         }
         val inWizard = origin == ORIGIN_WIZARD
@@ -92,7 +96,7 @@ class ProvisioningService : Service() {
         if (bootstrap == null) {
             Telemetry.report(TAG, "Started without a usable bootstrap", context = this)
             onStep(UpdateState.Failed(getString(R.string.provisioning_config_failed)))
-            stopSelf(startId)
+            stopIfIdle()
             return START_NOT_STICKY
         }
         Telemetry.info(
@@ -113,8 +117,8 @@ class ProvisioningService : Service() {
                 // report to. Recorded where the admin screen will show it.
                 Telemetry.report(
                     TAG,
-                    "Could not obtain the deployment config: ${error.message}",
-                    extras = mapOf("serverUrl" to bootstrap.serverUrl),
+                    "Could not obtain the deployment config",
+                    extras = mapOf("serverUrl" to bootstrap.serverUrl, "reason" to error.message),
                     context = this@ProvisioningService,
                 )
                 val reason = error.message ?: getString(R.string.provisioning_config_failed)
@@ -122,7 +126,7 @@ class ProvisioningService : Service() {
                 provisioner.recordBootstrapFailure(reason, bootstrap)
                 finish(UpdateState.Failed(reason))
                 Telemetry.flush()
-                stopSelf(startId)
+                stopIfIdle()
                 return@launch
             }
             staged.delete()
@@ -137,9 +141,10 @@ class ProvisioningService : Service() {
                     }
                     Telemetry.report(
                         TAG,
-                        "Provisioning finished with ${failures.size} failure(s)",
+                        "Provisioning finished with failures",
                         level = SentryLevel.WARNING,
                         extras = mapOf(
+                            "failureCount" to failures.size,
                             "failures" to failures,
                             "reportDelivered" to it.reportDelivered,
                             "isDeviceOwner" to it.report.isDeviceOwner,
@@ -160,9 +165,14 @@ class ProvisioningService : Service() {
                 ),
             )
             Telemetry.flush()
-            stopSelf(startId)
+            stopIfIdle()
         }
         return START_NOT_STICKY
+    }
+
+    /** Every run ends here rather than on its own start id, so an ignored start cannot end it. */
+    private fun stopIfIdle() {
+        if (!running) stopSelf()
     }
 
     /**
@@ -174,15 +184,16 @@ class ProvisioningService : Service() {
      * No `launchHome()` at the end: the trainer is watching the admin screen,
      * and throwing them back to the home screen would hide the result.
      */
-    private fun applyStagedUpdate(startId: Int) {
+    private fun applyStagedUpdate() {
         val config = Updates.stagedConfig(applicationContext)
         if (config == null) {
             Telemetry.report(TAG, "Asked to apply an update with nothing staged")
             UpdateProgress.report(UpdateState.Failed(getString(R.string.update_nothing_staged)))
-            stopSelf(startId)
+            stopIfIdle()
             return
         }
 
+        running = true
         scope.launch {
             val outcome = runCatching {
                 Provisioner(applicationContext).provision(config) { UpdateProgress.report(it) }
@@ -191,6 +202,8 @@ class ProvisioningService : Service() {
             // to be true both by the time someone reads "up to date" and walks
             // away, and before the kiosk update below kills this process.
             Updates.finish(applicationContext)
+
+            running = false
 
             // Last, after the payload, the policy and the report. Committing
             // this replaces the running app, so anything left undone here stays
@@ -208,9 +221,9 @@ class ProvisioningService : Service() {
                     if (failures.isNotEmpty()) {
                         Telemetry.report(
                             TAG,
-                            "Update finished with ${failures.size} failure(s)",
+                            "Update finished with failures",
                             level = SentryLevel.WARNING,
-                            extras = mapOf("failures" to failures),
+                            extras = mapOf("failureCount" to failures.size, "failures" to failures),
                         )
                     }
                     UpdateProgress.report(
@@ -234,7 +247,7 @@ class ProvisioningService : Service() {
                     )
                 }
             Telemetry.flush()
-            stopSelf(startId)
+            stopIfIdle()
         }
     }
 
@@ -300,6 +313,9 @@ class ProvisioningService : Service() {
         /** One setup at a time: the wizard and the broadcast can both ask. */
         @Volatile
         private var running = false
+
+        /** In this process only, which is the point: after a process death nothing is running. */
+        val isRunning: Boolean get() = running
 
         /** A null [bootstrap] runs the one [Provisioner.pendingBootstrap] kept. */
         fun start(context: Context, bootstrap: ProvisioningBootstrap?) =

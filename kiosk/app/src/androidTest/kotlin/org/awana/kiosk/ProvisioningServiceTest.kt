@@ -53,6 +53,9 @@ class ProvisioningServiceTest {
         SamplePayload.remove(context)
         payloadApk = SamplePayload.stage(context)
         lastReportFile().delete()
+        // A run from the previous test may still be finishing, and the service
+        // ignores a start while one is running.
+        await("the previous test's setup never finished") { !ProvisioningService.isRunning }
     }
 
     @After
@@ -139,6 +142,23 @@ class ProvisioningServiceTest {
         val outcome = UpdateProgress.state.value
         assertTrue("setup failed inside the wizard: $outcome", outcome is UpdateState.Done)
         assertTrue("the report never reached the trainer's phone", running.reports.isNotEmpty())
+        UpdateProgress.clear()
+    }
+
+    @Test
+    fun aSecondStartWhileSettingUpDoesNotCancelTheFirst() {
+        val running = serve()
+        running.config = TestConfigs.withServer(running.url, emptyList()).encode()
+        UpdateProgress.clear()
+
+        ProvisioningService.startInSetupWizard(context, bootstrapFor(running))
+        // The completion broadcast arriving while the wizard's run is going.
+        ProvisioningService.startAfterCompletion(context, bootstrapFor(running))
+
+        await("the setup never reported an outcome") { UpdateProgress.state.value.finished }
+        val outcome = UpdateProgress.state.value
+        assertTrue("the second start cut the first short: $outcome", outcome is UpdateState.Done)
+        assertEquals("setup ran twice", 1, running.fetched.count { it == "/config.json" })
         UpdateProgress.clear()
     }
 

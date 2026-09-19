@@ -74,8 +74,8 @@ class LocalAppsTest {
         val spec = ConfigStore(context).load()!!.packages.single { it.packageName == SamplePayload.PACKAGE }
         assertTrue("the key it was allowed with was not recorded", spec.certSha256.isNotBlank())
         assertTrue(
-            "an allowed app is still offered as not allowed",
-            LocalApps.unlisted(context).none { it.packageName == SamplePayload.PACKAGE },
+            "an allowed app was not put on the home screen",
+            ConfigStore(context).load()!!.launcher.any { it.packageName == SamplePayload.PACKAGE },
         )
     }
 }

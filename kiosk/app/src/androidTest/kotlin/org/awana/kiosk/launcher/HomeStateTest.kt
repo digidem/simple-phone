@@ -15,6 +15,8 @@ import org.awana.kiosk.shared.PackageSpec
 import org.awana.kiosk.shared.ProvisioningBootstrap
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.awana.kiosk.policy.DevicePolicy
+import org.junit.Assume.assumeFalse
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -133,6 +135,8 @@ class HomeStateTest {
 
     @Test
     fun removingTheLockFromAPhoneItNeverOwnedIsNotRecordedAsARemoval() = runBlocking {
+        // On the Device Owner emulator this would really remove the lock.
+        assumeFalse(DevicePolicy(context).isDeviceOwner)
         unprovision(context)
 
         assertFalse(PhoneLock.isRemoved(context))

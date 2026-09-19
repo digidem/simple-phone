@@ -11,7 +11,7 @@ import io.sentry.Breadcrumb
 import io.sentry.Sentry
 import io.sentry.SentryLevel
 import io.sentry.android.core.SentryAndroid
-import java.util.concurrent.atomic.AtomicBoolean
+import java.net.Inet4Address
 
 /**
  * Crash and diagnostic reporting for both apps, through Sentry.
@@ -25,14 +25,18 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object Telemetry {
 
-    private val started = AtomicBoolean(false)
+    private var started = false
 
     /**
      * Safe to call from every entry point: only the first call does anything.
-     * Does disk I/O, so the launcher calls it off the main thread.
+     * Synchronized so a second caller waits for the SDK to be up rather than
+     * reporting into one that is not. Does disk I/O, so the launcher calls it
+     * off the main thread.
      */
+    @Synchronized
     fun init(context: Context) {
-        if (!started.compareAndSet(false, true)) return
+        if (started) return
+        started = true
         // Instrumented tests run on emulators and deliberately fail
         // provisioning; none of that belongs in the field reports.
         if (isEmulator()) return
@@ -132,14 +136,18 @@ object Telemetry {
                 "internet" to (caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true),
                 "validated" to (caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true),
                 "interface" to link?.interfaceName,
-                "addresses" to link?.linkAddresses?.map { it.toString() },
+                // Private IPv4 only: a mobile network's IPv6 addresses are public.
+                "addresses" to link?.linkAddresses
+                    ?.map { it.address }
+                    ?.filter { it is Inet4Address && it.isSiteLocalAddress }
+                    ?.map { it.hostAddress },
             )
         }
         return mapOf("networks" to all, "hasDefault" to (default != null))
     }
 
-    private fun isEmulator(): Boolean =
-        Build.HARDWARE in setOf("ranchu", "goldfish") || Build.FINGERPRINT.startsWith("generic")
+    /** By hardware alone: some white-label phone ROMs also have "generic" fingerprints. */
+    private fun isEmulator(): Boolean = Build.HARDWARE in setOf("ranchu", "goldfish")
 
     private const val TAG = "Telemetry"
 }

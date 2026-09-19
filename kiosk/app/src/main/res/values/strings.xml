@@ -7,4 +7,5 @@
     <string name="provisioning_config_failed">The settings for this device could not be obtained. Set the device up again from the trainer\'s phone.</string>
     <string name="update_nothing_staged">There were no new settings to apply. Scan the code again.</string>
     <string name="update_failed">The update stopped before it finished.</string>
+    <string name="update_setup_running">This phone is still setting itself up. Try again when it has finished.</string>
 </resources>

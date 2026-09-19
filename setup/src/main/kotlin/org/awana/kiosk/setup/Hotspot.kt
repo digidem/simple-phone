@@ -2,6 +2,8 @@ package org.awana.kiosk.setup
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
 import android.net.wifi.SoftApConfiguration
 import android.net.wifi.WifiManager
 import android.os.Handler
@@ -176,13 +178,21 @@ internal fun siteLocalAddresses(): List<LocalAddress> =
 
 /**
  * Interfaces this phone reaches a network *through*: its own Wi-Fi connection,
- * mobile data. A hotspot is not a network the phone is a client of, so its
- * interface never appears here.
+ * mobile data. From Android 15 the connectivity stack can also register
+ * local-only networks, which is how a hotspot may appear; those are left out,
+ * or the hotspot would rule itself out.
  */
 internal fun clientInterfaces(context: Context): Set<String> {
     val manager = context.getSystemService(ConnectivityManager::class.java) ?: return emptySet()
     @Suppress("DEPRECATION")
-    return manager.allNetworks.mapNotNull { manager.getLinkProperties(it)?.interfaceName }.toSet()
+    return manager.allNetworks
+        .filterNot { network ->
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM &&
+                manager.getNetworkCapabilities(network)
+                    ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK) == true
+        }
+        .mapNotNull { manager.getLinkProperties(it)?.interfaceName }
+        .toSet()
 }
 
 /**
@@ -198,9 +208,13 @@ internal fun pickHotspotAddress(candidates: List<LocalAddress>, clientInterfaces
         .minByOrNull { interfaceRank(it.interfaceName) }
         ?.address
 
-/** Whether [address] is still one of this phone's own, for a session to notice its hotspot going. */
+/**
+ * Whether [address] is still one of this phone's own, for a session to notice
+ * its hotspot going. A failure to list interfaces says nothing about the
+ * hotspot, so it counts as still there.
+ */
 internal fun isLocalAddress(address: String): Boolean =
-    runCatching { siteLocalAddresses().any { it.address == address } }.getOrDefault(false)
+    runCatching { siteLocalAddresses().any { it.address == address } }.getOrDefault(true)
 
 internal fun describeInterfaces(context: Context): String {
     val clients = clientInterfaces(context)

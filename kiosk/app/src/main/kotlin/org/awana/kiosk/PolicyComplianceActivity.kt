@@ -17,6 +17,7 @@ import org.awana.kiosk.launcher.SetupWorking
 import org.awana.kiosk.policy.DevicePolicy
 import org.awana.kiosk.policy.Provisioner
 import org.awana.kiosk.policy.UpdateProgress
+import org.awana.kiosk.policy.UpdateState
 import org.awana.kiosk.shared.Telemetry
 
 /**
@@ -51,6 +52,11 @@ class PolicyComplianceActivity : ComponentActivity() {
         if (savedInstanceState == null) {
             UpdateProgress.clear()
             ProvisioningService.startInSetupWizard(this, bootstrap)
+        } else if (!ProvisioningService.isRunning && !UpdateProgress.state.value.finished) {
+            // Recreated after the process died: the run died with it, and
+            // waiting on it would hold the wizard for the whole timeout.
+            Telemetry.warn(TAG, "Recreated with no setup running; starting it again")
+            ProvisioningService.startInSetupWizard(this, bootstrap)
         }
 
         setContent {
@@ -63,6 +69,13 @@ class PolicyComplianceActivity : ComponentActivity() {
         lifecycleScope.launch {
             val outcome = withTimeoutOrNull(LIMIT_MS) { UpdateProgress.state.first { it.finished } }
             if (outcome == null) Telemetry.report(TAG, "Setup did not finish in time; releasing the wizard")
+            if (outcome !is UpdateState.Done) {
+                // A successful run made this app HOME; a failed one never got
+                // that far. Without it the wizard ends on the stock launcher
+                // rather than on the screen that offers to set up again.
+                runCatching { DevicePolicy(this@PolicyComplianceActivity).applyHome() }
+                    .onFailure { Telemetry.warn(TAG, "Could not make the launcher HOME after a failed setup", it) }
+            }
             UpdateProgress.clear()
             finishWithOk()
         }

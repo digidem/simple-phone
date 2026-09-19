@@ -118,7 +118,10 @@ class ProvisioningSession(context: Context) {
                 TAG,
                 "The hotspot did not start: ${error.message}",
                 level = SentryLevel.WARNING,
-                extras = mapOf("hotspot" to hotspot.javaClass.simpleName),
+                extras = mapOf(
+                    "hotspot" to hotspot.javaClass.simpleName,
+                    "interfaces" to describeInterfaces(appContext),
+                ),
                 context = appContext,
             )
             _state.value = failed(profile, error.message)
@@ -249,12 +252,16 @@ class ProvisioningSession(context: Context) {
      * the trainer is told instead.
      */
     suspend fun watchAddress(isStillLocal: (String) -> Boolean = ::isLocalAddress) {
+        var misses = 0
         while (true) {
             delay(WATCH_MS)
             val now = _state.value
             if (!now.running) return
             val address = now.hotspot?.gatewayAddress ?: return
-            if (isStillLocal(address)) continue
+            // A hotspot restarting on a new channel drops its address for a
+            // moment; only a sustained absence means phones cannot reach it.
+            misses = if (isStillLocal(address)) 0 else misses + 1
+            if (misses < MISSES_BEFORE_TEARDOWN) continue
 
             Telemetry.report(
                 TAG,
@@ -262,6 +269,8 @@ class ProvisioningSession(context: Context) {
                 level = SentryLevel.WARNING,
                 extras = mapOf("address" to address, "interfaces" to describeInterfaces(appContext)),
             )
+            // Only if the trainer has not stopped it meanwhile.
+            if (!_state.value.running) return
             stop()
             _state.value = SessionState(
                 profileId = now.profileId,
@@ -316,9 +325,11 @@ class ProvisioningSession(context: Context) {
         }
         Telemetry.report(
             TAG,
-            "Setup report from ${report.deviceLabel}: ${failures.size} failure(s)",
+            "Setup report with failures",
             level = SentryLevel.WARNING,
             extras = mapOf(
+                "deviceLabel" to report.deviceLabel,
+                "failureCount" to failures.size,
                 "address" to address,
                 "device" to "${report.manufacturer} ${report.model}",
                 "android" to "${report.androidVersion} (API ${report.apiLevel})",
@@ -352,6 +363,7 @@ class ProvisioningSession(context: Context) {
     private companion object {
         const val TAG = "ProvisioningSession"
         const val WATCH_MS = 5_000L
+        const val MISSES_BEFORE_TEARDOWN = 3
         const val PORT = 8080
         const val SOCKET_TIMEOUT_MS = 60_000
         const val KIOSK_APK = "kiosk.apk"

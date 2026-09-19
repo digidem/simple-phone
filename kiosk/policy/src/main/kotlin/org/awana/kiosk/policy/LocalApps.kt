@@ -42,7 +42,8 @@ object LocalApps {
      */
     suspend fun allow(context: Context, packageName: String): List<String> = withContext(Dispatchers.Default) {
         val installed = DeviceFacts.installedPackage(context, packageName)
-        val cert = Certificates.ofInstalledPackage(context, packageName).firstOrNull()
+        // Last: for a key rotated under APK Signature Scheme v3 the history runs oldest first.
+        val cert = Certificates.ofInstalledPackage(context, packageName).lastOrNull()
         if (installed == null || cert == null) {
             return@withContext listOf(context.getString(R.string.local_app_missing, packageName))
         }
