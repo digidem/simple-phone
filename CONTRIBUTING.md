@@ -54,7 +54,8 @@ setup/            The setup app: APK library, deployment profiles, hotspot,
 sample/           Not shipped. A real APK for the end-to-end test to install.
 tools/            test.sh and dev-keys.sh.
 testdata/         The golden provisioning QR fixture.
-docs/             Hardware checklist and the original specification.
+docs/             Hardware checklist, the CI and release plan, and the
+                  original specification.
 ```
 
 Both apps are minSdk 30, targetSdk 36, built with JDK 17.
