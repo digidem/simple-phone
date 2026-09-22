@@ -68,11 +68,12 @@ class PolicyComplianceActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             val outcome = withTimeoutOrNull(LIMIT_MS) { UpdateProgress.state.first { it.finished } }
-            if (outcome == null) Telemetry.report(TAG, "Setup did not finish in time; releasing the wizard")
-            if (outcome !is UpdateState.Done) {
-                // A successful run made this app HOME; a failed one never got
-                // that far. Without it the wizard ends on the stock launcher
-                // rather than on the screen that offers to set up again.
+            if (outcome == null) {
+                Telemetry.report(TAG, "Setup did not finish in time; releasing the wizard")
+                // The service makes this app HOME when a run fails; a run that
+                // never finished is the one case left, and without it the
+                // wizard ends on the stock launcher rather than on the screen
+                // that offers to set up again.
                 runCatching { DevicePolicy(this@PolicyComplianceActivity).applyHome() }
                     .onFailure { Telemetry.warn(TAG, "Could not make the launcher HOME after a failed setup", it) }
             }

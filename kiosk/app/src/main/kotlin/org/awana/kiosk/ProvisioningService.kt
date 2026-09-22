@@ -77,6 +77,10 @@ class ProvisioningService : Service() {
         // wizard brings up HOME itself when it ends.
         val onStep: (UpdateState) -> Unit = if (inWizard) UpdateProgress::report else { _ -> }
         val finish = { outcome: UpdateState ->
+            // A successful run made this app HOME inside provision(); a failed
+            // one never got that far, and without it the screen offering to
+            // set up again is one HOME press from the stock launcher.
+            if (outcome !is UpdateState.Done) makeHome()
             onStep(outcome)
             if (!inWizard) launchHome()
         }
@@ -254,6 +258,13 @@ class ProvisioningService : Service() {
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()
+    }
+
+    private fun makeHome() {
+        val policy = DevicePolicy(applicationContext)
+        if (!policy.isDeviceOwner) return
+        runCatching { policy.applyHome() }
+            .onFailure { Telemetry.warn(TAG, "Could not make the launcher HOME after a failed setup", it) }
     }
 
     /**

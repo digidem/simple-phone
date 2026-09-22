@@ -1,6 +1,7 @@
 package org.awana.kiosk
 
 import android.content.Context
+import android.content.Intent
 import android.os.SystemClock
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -103,6 +104,9 @@ class ProvisioningServiceTest {
             listOf(PackageSpec(SamplePayload.PACKAGE, "0".repeat(64), SamplePayload.PATH)),
         ).encode()
 
+        // Not HOME going in, so what is asserted below is this run's doing.
+        DevicePolicy(context).clearHome()
+
         // What an attacker on the hotspot can do: serve their own config. The
         // hash came through the setup wizard, where they cannot reach it.
         ProvisioningService.start(
@@ -112,6 +116,13 @@ class ProvisioningServiceTest {
 
         await("the service recorded nothing for the admin screen to show") {
             Provisioner(context).lastReport() != null
+        }
+        // The screen offering to set up again is only reachable if this app is
+        // HOME, and on Android 11 nothing but this run makes it so: the
+        // wizard's compliance activity, which does it from 12, never runs.
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        await("the launcher is not HOME after a refused config") {
+            context.packageManager.resolveActivity(home, 0)?.activityInfo?.packageName == context.packageName
         }
         val report = Provisioner(context).lastReport()!!
         val reason = report.failures.single()
