@@ -52,9 +52,12 @@ kiosk/app/        Assembly: the DeviceAdminReceiver, the boot receiver, the
 setup/            The setup app: APK library, deployment profiles, hotspot,
                   HTTP server, QR, session status and phone list.
 sample/           Not shipped. A real APK for the end-to-end test to install.
-tools/            test.sh and dev-keys.sh.
+handshake/        Not shipped. Plays the trainer's phone on the emulator, so the
+                  setup wizard's own provisioning flow can run against the kiosk.
+tools/            test.sh, dev-keys.sh, handshake.sh and platform-key.sh.
 testdata/         The golden provisioning QR fixture.
-docs/             Hardware checklist, the CI and release plan, and the
+docs/             Hardware checklist, the CI and release plan, the plan for
+                  testing the setup wizard handshake on an emulator, and the
                   original specification.
 ```
 
@@ -225,6 +228,50 @@ for f in glob.glob('**/build/outputs/androidTest-results/connected/debug/*.xml',
 "
 ```
 
+### The setup wizard handshake
+
+`tools/handshake.sh` runs the part the instrumented suite cannot reach.
+ManagedProvisioning is started with the extras the setup code carries, and then
+does what a trainer's scan makes it do: download the kiosk from the
+`:handshake` app's server, check its signature, install it, make it Device
+Owner and call the provisioning activities. The kiosk then fetches its config,
+installs the payload and posts a setup report. No camera and no hotspot;
+`:handshake` plays the trainer's phone on the same emulator as the field phone.
+
+Three things it insists on. The AVD must never have had a device owner, since
+Android hands ownership over only during the setup of a factory-fresh phone;
+the driver refuses one that has. It needs `adb root`, because the device policy
+service latches "setup complete" into `/data/system/device_policies.xml` at
+first boot and settings alone do not unlatch it. And the image has to be a
+`default` (AOSP) one: it is userdebug, so root works, and its framework is
+signed with the public AOSP platform key, which `tools/platform-key.sh`
+fetches and `:handshake` is signed with to hold the signature permission that
+starting provisioning needs. Play images give neither. So make an AVD for this
+and wipe it before every run. **Never `kiosk_aosp_30` or `kiosk_ui_30`**: a run
+leaves a provisioned device behind, and either would then have to be recreated.
+
+```sh
+avdmanager create avd -n kiosk_wizard_30 \
+  -k "system-images;android-30;default;arm64-v8a" -d pixel_5
+emulator -avd kiosk_wizard_30 -no-snapshot -no-boot-anim -no-audio -wipe-data &
+
+tools/handshake.sh                       # kiosk_wizard_30
+KIOSK_WIZARD_AVD=kiosk_wizard_34 tools/handshake.sh
+```
+
+The driver taps the wizard's screens the way a trainer does, and starts
+`PROVISION_FINALIZATION` itself, because the AOSP stub wizard never does. It
+then checks, from the host: the kiosk is Device Owner, `/dpc.apk` and
+`/config.json` were requested, the payload is installed, one setup report
+arrived with no failures, the kiosk is HOME, and the wizard finished. Which
+steps of the handshake it expects depends on the level. API 30 sends only
+`PROFILE_PROVISIONING_COMPLETE`; from Android 12 the wizard calls
+`GET_PROVISIONING_MODE` before setting the owner and `ADMIN_POLICY_COMPLIANCE`
+at finalisation, in which the setup runs, and no completion broadcast arrives.
+About four minutes a level once the emulator has booted. Google's provisioning
+role holder and OEM wizards are out of its reach, and stay manual on a real
+phone.
+
 ## Architecture
 
 The seam that makes everything testable: **`onProfileProvisioningComplete` is a
@@ -236,8 +283,10 @@ without a camera or a setup wizard. Do not grow logic into the receiver.
 Setup is started from `ACTION_ADMIN_POLICY_COMPLIANCE`, not from the
 receiver. From Android 12 that activity is the one point a device owner is
 sure to get before the setup wizard ends — "DPC setup can't be started after
-the end of the setup wizard" — and the completion broadcast never arrived at
-all on a Galaxy A17 on Android 16. `PolicyComplianceActivity` hands the
+the end of the setup wizard" — and from Android 12 the completion broadcast may
+not arrive at all. It did not on a Galaxy A17 on Android 16, and
+`tools/handshake.sh` reproduces that on an AOSP emulator, so it is the
+platform rather than that phone. `PolicyComplianceActivity` hands the
 bootstrap to a foreground service, shows its steps, and holds the wizard until
 it is done; the wizard then brings up the kiosk as HOME. The receiver is kept
 as a fallback for a wizard that does run it, and the service ignores it once

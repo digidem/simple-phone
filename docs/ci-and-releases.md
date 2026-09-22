@@ -85,6 +85,9 @@ is not a pass: every Device-Owner test starts with `assumeTrue(isDeviceOwner)`,
 so a lost owner would otherwise show as a green run.
 
 Keep the AVD names as they are, so `tools/test.sh` finds them by name unchanged.
+[handshake-and-api-matrix.md](handshake-and-api-matrix.md) plans two extensions
+to this workflow: a matrix of API levels for `owner`, and a third job that runs
+the setup wizard's own provisioning flow on a fresh emulator.
 `tools/test.sh` needs subcommands (`owner`, `ui`, `setup`) so CI can run one
 role; with no argument it should behave exactly as it does today.
 

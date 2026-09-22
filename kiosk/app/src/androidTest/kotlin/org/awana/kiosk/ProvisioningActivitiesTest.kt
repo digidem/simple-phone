@@ -15,7 +15,8 @@ import org.junit.runner.RunWith
  * a QR provisioning run can stop without them. Nothing in the instrumented suite
  * exercises the wizard itself, so what is checked here is what the wizard looks
  * for: that this package answers both, and behind the permission that keeps any
- * other app from starting them.
+ * other app from starting them. `tools/handshake.sh` does run the wizard, on an
+ * emulator and outside this suite.
  */
 @RunWith(AndroidJUnit4::class)
 class ProvisioningActivitiesTest {
