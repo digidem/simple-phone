@@ -32,3 +32,6 @@ include(":setup")
 
 // Not shipped. A real APK for the end-to-end provisioning test to install.
 include(":sample")
+
+// Not shipped. Runs the setup wizard's provisioning flow against the kiosk on an emulator.
+include(":handshake")
