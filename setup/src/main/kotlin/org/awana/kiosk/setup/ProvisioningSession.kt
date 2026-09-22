@@ -1,14 +1,12 @@
 package org.awana.kiosk.setup
 
 import android.content.Context
-import android.util.Base64
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-import org.awana.kiosk.shared.Certificates
 import org.awana.kiosk.shared.Digests
-import org.awana.kiosk.shared.Digests.hexToBytes
+import org.awana.kiosk.shared.SetupCode
 import org.awana.kiosk.shared.SetupReport
 import org.awana.kiosk.shared.KioskConfig
 import org.awana.kiosk.shared.KioskJson
@@ -216,9 +214,9 @@ class ProvisioningSession(context: Context) {
         }
         server = running
 
-        val payload = QrPayload.build(
+        val payload = SetupCode.build(
             serverUrl = serverUrl,
-            signatureChecksum = signatureChecksumOf(appContext, kioskApk),
+            signatureChecksum = SetupCode.signatureChecksumOf(appContext, kioskApk),
             wifiSsid = details.ssid,
             wifiPassphrase = details.passphrase,
             wifiSecurityType = details.securityType,
@@ -373,13 +371,6 @@ class ProvisioningSession(context: Context) {
 }
 
 /**
- * Base64url SHA-256 of the signing certificate, unpadded, as
- * `EXTRA_PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM` requires.
- *
- * Computed from the APK being served rather than hardcoded, so debug and release
- * builds both work and there is no constant to forget at release time.
- */
-/**
  * The version of the kiosk this build bundles, read from the APK it will serve
  * rather than from `BuildConfig`: the setup app and the kiosk it carries
  * are versioned separately, and it is the served file that phones will get.
@@ -389,15 +380,6 @@ private fun kioskVersionCodeOf(context: Context, apk: File): Long? = runCatching
         .getPackageArchiveInfo(apk.absolutePath, 0)
         ?.longVersionCode
 }.getOrNull()
-
-fun signatureChecksumOf(context: Context, apk: File): String {
-    val fingerprint = Certificates.ofApkFile(context, apk).firstOrNull()
-        ?: error("Could not read a signing certificate from the kiosk APK at ${apk.path}")
-    return Base64.encodeToString(
-        fingerprint.hexToBytes(),
-        Base64.NO_WRAP or Base64.NO_PADDING or Base64.URL_SAFE,
-    )
-}
 
 private fun List<SetupReport>.replacing(report: SetupReport): List<SetupReport> =
     filterNot { it.deviceId == report.deviceId } + report

@@ -43,7 +43,7 @@ class QrPayloadTest {
             .digest(KioskJson.compact.encodeToString(KioskConfig.serializer(), config).toByteArray())
             .joinToString("") { "%02x".format(it) }
 
-    private fun fixedPayload(packages: List<PackageSpec> = fixedPackages()) = QrPayload.build(
+    private fun fixedPayload(packages: List<PackageSpec> = fixedPackages()) = SetupCode.build(
         serverUrl = "http://192.168.43.1:8080",
         signatureChecksum = "RmFrZUNoZWNrc3VtRm9yVGVzdHNPbmx5X18wMDAwMDAwMA",
         wifiSsid = "AndroidShare_1234",
@@ -143,7 +143,7 @@ class QrPayloadTest {
         ).toByteArray().size
 
         assertEquals(two, thirty)
-        assertTrue("a 30-app deployment produced $thirty bytes", thirty <= QrPayload.COMFORTABLE_BYTES)
+        assertTrue("a 30-app deployment produced $thirty bytes", thirty <= SetupCode.COMFORTABLE_BYTES)
     }
 
     @Test
@@ -201,8 +201,8 @@ class QrPayloadTest {
         val size = fixedPayload().toByteArray().size
         assertTrue(
             "a two-app deployment produced $size bytes, over the " +
-                "${QrPayload.COMFORTABLE_BYTES} a budget phone camera reads reliably",
-            size <= QrPayload.COMFORTABLE_BYTES,
+                "${SetupCode.COMFORTABLE_BYTES} a budget phone camera reads reliably",
+            size <= SetupCode.COMFORTABLE_BYTES,
         )
     }
 
@@ -220,7 +220,7 @@ class QrPayloadTest {
     fun aLongDeploymentNameStillCannotOverflowTheCode() {
         // The app list no longer affects the size, but free text in the QR
         // still does, so the guard stays.
-        val huge = QrPayload.build(
+        val huge = SetupCode.build(
             serverUrl = "http://192.168.43.1:8080",
             signatureChecksum = "x".repeat(2_000),
             wifiSsid = "AndroidShare_1234",
@@ -230,7 +230,7 @@ class QrPayloadTest {
             timeZone = "America/Manaus",
             configSha256 = configHash(fixedConfig()),
         )
-        assertTrue(huge.toByteArray().size > QrPayload.COMFORTABLE_BYTES)
+        assertTrue(huge.toByteArray().size > SetupCode.COMFORTABLE_BYTES)
     }
 
     /**
@@ -239,7 +239,7 @@ class QrPayloadTest {
      */
     @Test
     fun `the kiosk can read back what this builds`() {
-        val payload = QrPayload.build(
+        val payload = SetupCode.build(
             serverUrl = "http://192.168.43.1:8080/",
             signatureChecksum = SetupCode.checksumOf("aa".repeat(32)),
             wifiSsid = "Awana-Setup",

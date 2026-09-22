@@ -59,6 +59,7 @@ import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import org.awana.kiosk.design.okColors
+import org.awana.kiosk.shared.SetupCode
 
 /**
  * The live session: the code to scan, the three steps written out, and one line
@@ -293,7 +294,7 @@ internal fun SessionBody(
 
 @Composable
 private fun Qr(payload: String) {
-    val tooBig = payload.toByteArray().size > QrPayload.COMFORTABLE_BYTES
+    val tooBig = payload.toByteArray().size > SetupCode.COMFORTABLE_BYTES
     val bitmap = remember(payload) { runCatching { QrPayload.render(payload) }.getOrNull() }
 
     if (tooBig || bitmap == null) {
