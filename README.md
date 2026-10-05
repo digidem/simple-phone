@@ -1,7 +1,7 @@
 # Simple Phone
 
-> [!WARNING]
-> **Proof-of-concept prototype.** This project is not yet ready for production use. Expect breaking changes, missing features and rough edges, and do not rely on it for real deployments.
+> [!NOTE]
+> **Beta.** Simple Phone is ready for early deployments, but it has only been tested on a limited range of phones so far. Set up and check one or two phones before setting up a whole group, and please report any problems you find.
 
 Two Android apps that turn a batch of ordinary phones into simple phones: each one locked down to a handful of chosen apps, set up in minutes by a trainer, with no Google account and no internet connection.
 
