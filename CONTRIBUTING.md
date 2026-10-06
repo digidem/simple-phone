@@ -559,7 +559,8 @@ different sessions of the same deployment still belong together.
 `EXTRA_PROVISIONING_WIFI_SECURITY_TYPE` accepts only `NONE`, `WPA`, `WEP` and
 `EAP`; a local-only hotspot can hand back WPA3-SAE, which cannot be expressed at
 all. The app routes that case to the manual tethering fallback rather than
-emitting a QR that silently fails to connect.
+emitting a QR that silently fails to connect. WPA2/WPA3 transition mode still
+admits WPA2 clients, so it goes in the QR as `WPA`.
 
 **Keep the QR payload under `QrPayload.COMFORTABLE_BYTES`.** Beyond that the
 code needs enough modules that a budget phone camera struggles in poor light. A

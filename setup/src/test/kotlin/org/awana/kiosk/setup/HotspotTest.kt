@@ -1,5 +1,6 @@
 package org.awana.kiosk.setup
 
+import android.net.wifi.SoftApConfiguration
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -39,6 +40,19 @@ class HotspotTest {
     fun theInterfacesTheHotspotCanRunOnAreRankedTogether() {
         assertEquals(interfaceRank("ap0"), interfaceRank("swlan0"))
         assertEquals(interfaceRank("ap0"), interfaceRank("wlan9"))
+    }
+
+    @Test
+    fun aMixedWpa2AndWpa3HotspotIsDescribedAsWpa() {
+        // Admits WPA2 clients, which is all the setup wizard can ask for.
+        assertEquals("WPA", qrSecurityType(SoftApConfiguration.SECURITY_TYPE_WPA3_SAE_TRANSITION))
+        assertEquals("WPA", qrSecurityType(SoftApConfiguration.SECURITY_TYPE_WPA2_PSK))
+        assertEquals("NONE", qrSecurityType(SoftApConfiguration.SECURITY_TYPE_OPEN))
+    }
+
+    @Test
+    fun aWpa3OnlyHotspotCannotBeDescribed() {
+        assertEquals(null, qrSecurityType(SoftApConfiguration.SECURITY_TYPE_WPA3_SAE))
     }
 
     @Test

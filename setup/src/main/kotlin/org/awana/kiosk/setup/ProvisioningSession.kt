@@ -119,6 +119,7 @@ class ProvisioningSession(context: Context) {
                 extras = mapOf(
                     "hotspot" to hotspot.javaClass.simpleName,
                     "interfaces" to describeInterfaces(appContext),
+                    "detail" to (error as? HotspotError)?.detail,
                 ),
                 context = appContext,
             )

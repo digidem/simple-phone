@@ -79,21 +79,16 @@ class LocalOnlyHotspot(context: Context) : Hotspot {
 
     private fun describe(res: WifiManager.LocalOnlyHotspotReservation): Result<HotspotDetails> {
         val config = res.softApConfiguration
-        val security = when (config.securityType) {
-            SoftApConfiguration.SECURITY_TYPE_OPEN -> HotspotDetails.SECURITY_NONE
-            SoftApConfiguration.SECURITY_TYPE_WPA2_PSK -> HotspotDetails.SECURITY_WPA
-            else -> {
-                // The QR format has no value for WPA3-SAE, so a phone that only
-                // offers it cannot be used this way at all. Better to say so
-                // than to emit a QR that silently fails to connect.
-                res.close()
-                return Result.failure(
-                    HotspotError(
-                        "This phone's hotspot uses a newer Wi-Fi security type (WPA3) that the " +
-                            "setup QR cannot describe. Use the manual hotspot option instead.",
-                    ),
-                )
-            }
+        val security = qrSecurityType(config.securityType) ?: run {
+            // Better to say so than to emit a QR that silently fails to connect.
+            res.close()
+            return Result.failure(
+                HotspotError(
+                    "This phone's hotspot uses a newer Wi-Fi security type (WPA3) that the " +
+                        "setup QR cannot describe. Use the manual hotspot option instead.",
+                    detail = "softApSecurityType=${config.securityType}",
+                ),
+            )
         }
         val gateway = localAddress(appContext) ?: return Result.failure(
             HotspotError("The hotspot started but has no address yet. Try again."),
@@ -155,7 +150,20 @@ class ManualHotspot(
     override fun stop() = Unit
 }
 
-class HotspotError(message: String) : Exception(message)
+/** [detail] goes to telemetry only; the message is what the trainer reads. */
+class HotspotError(message: String, val detail: String? = null) : Exception(message)
+
+/**
+ * The QR's name for a local-only hotspot's security type, or null when it has
+ * none. WPA3-SAE transition mode still admits WPA2 clients, so it is WPA.
+ */
+internal fun qrSecurityType(softApSecurityType: Int): String? = when (softApSecurityType) {
+    SoftApConfiguration.SECURITY_TYPE_OPEN -> HotspotDetails.SECURITY_NONE
+    SoftApConfiguration.SECURITY_TYPE_WPA2_PSK,
+    SoftApConfiguration.SECURITY_TYPE_WPA3_SAE_TRANSITION,
+    -> HotspotDetails.SECURITY_WPA
+    else -> null
+}
 
 /**
  * The gateway address is commonly 192.168.43.1 but varies by OEM, so it is read
