@@ -26,8 +26,8 @@ android {
         applicationId = "org.awana.kiosk"
         minSdk = 30
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.0-pre.4"
+        versionCode = 3
+        versionName = "1.0.0-pre.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["sentryDsn"] = providers.gradleProperty("sentryDsn").getOrElse("")
     }
